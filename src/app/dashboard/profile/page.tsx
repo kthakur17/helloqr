@@ -19,7 +19,14 @@ const EMAIL_RE = /^[^\s@<>()"',;]+@[^\s@<>()"',;]+\.[^\s@<>()"',;]{2,}$/;
 export default function ProfileEditorPage() {
   const { username, profile, user, setProfile } = useAccount();
   const [draft, setDraft] = useState<Profile>(profile);
-  const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
+  // Flag saved links that no longer pass the checks (e.g. a WhatsApp number saved without a country code).
+  const [linkErrors, setLinkErrors] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      profile.links
+        .map((link) => [link.id, normalizeLinkValue(link.type, link.value).error] as const)
+        .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
+    ),
+  );
   const [status, setStatus] = useState<{ kind: "idle" | "saving" | "saved" | "error"; message?: string }>({ kind: "idle" });
   const [photoBusy, setPhotoBusy] = useState(false);
   const [cropping, setCropping] = useState<{ source: ImageBitmap; url: string; objectUrl: boolean } | null>(null);

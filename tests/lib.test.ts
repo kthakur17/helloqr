@@ -33,8 +33,20 @@ test("urls, email and phone", () => {
   assert.ok(norm("calendly", "https://example.com/me").error);
   assert.deepEqual(norm("email", "me@example.com"), { value: "me@example.com" });
   assert.ok(norm("email", "not-an-email").error);
-  assert.deepEqual(norm("whatsapp", "+91 98765 43210"), { value: "919876543210" });
+  assert.deepEqual(norm("whatsapp", "+91 98765 43210"), { value: "+919876543210" });
+  assert.deepEqual(norm("whatsapp", "0091 98765-43210"), { value: "+919876543210" });
   assert.ok(norm("whatsapp", "12345").error);
+});
+
+test("WhatsApp numbers must carry a country code", () => {
+  // wa.me reads a national number as a username: "@9876543210 isn't on WhatsApp".
+  assert.match(norm("whatsapp", "9876543210").error ?? "", /country code/);
+  assert.match(norm("whatsapp", "98765 43210").error ?? "", /country code/);
+  assert.deepEqual(norm("whatsapp", "919876543210"), { value: "+919876543210" }, "older saved digits that include the code still pass");
+  assert.deepEqual(norm("whatsapp", "+919876543210"), { value: "+919876543210" }, "re-checking a saved value is stable");
+  assert.equal(hrefFor({ type: "whatsapp", value: "+919876543210" }), "https://wa.me/919876543210");
+  assert.equal(displayValue({ type: "whatsapp", value: "+919876543210" }), "+919876543210");
+  assert.ok(norm("whatsapp", "+91 abc").error);
 });
 
 test("hrefFor re-validates stored values and never emits a script URL", () => {

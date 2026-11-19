@@ -63,7 +63,7 @@ export const LINK_SPECS: Record<LinkType, LinkSpec> = {
   },
   discord: { label: "Discord", kind: "url", hosts: ["discord.com", "discord.gg"], placeholder: "Server invite or profile URL" },
   telegram: { label: "Telegram", kind: "handle", hosts: ["t.me", "telegram.me"], base: "https://t.me/", prefix: "/", placeholder: "@username" },
-  whatsapp: { label: "WhatsApp", kind: "phone", placeholder: "Number with country code, e.g. 91 98xxxxxx" },
+  whatsapp: { label: "WhatsApp", kind: "phone", placeholder: "+91 98765 43210 (with country code)" },
   calendly: { label: "Calendly", kind: "url", hosts: ["calendly.com"], placeholder: "https://calendly.com/you" },
   behance: { label: "Behance", kind: "handle", hosts: ["behance.net"], base: "https://www.behance.net/", prefix: "/", placeholder: "username" },
   dribbble: { label: "Dribbble", kind: "handle", hosts: ["dribbble.com"], base: "https://dribbble.com/", prefix: "/", placeholder: "username" },
@@ -156,8 +156,18 @@ export function normalizeLinkValue(type: LinkType, raw: string): Normalized {
     case "email":
       return EMAIL_RE.test(input) && input.length <= 120 ? { value: input } : { error: "Enter a valid email address." };
     case "phone": {
-      const digits = input.replace(/[\s()+.-]/g, "");
-      return PHONE_RE.test(digits) ? { value: digits } : { error: "Enter the number with country code, digits only." };
+      // WhatsApp links need the full international number. A 10-digit number without "+" could be
+      // from any country, so it is refused rather than guessed (wa.me treats it as a username).
+      const compact = input.replace(/[\s().-]/g, "");
+      const international = compact.startsWith("+") ? compact.slice(1) : compact.startsWith("00") ? compact.slice(2) : null;
+      const digits = international ?? compact;
+      if (!/^\d+$/.test(digits)) {
+        return { error: "Use digits only, starting with your country code, e.g. +91 98765 43210." };
+      }
+      if (international === null && digits.length <= 10) {
+        return { error: "Add your country code at the start, e.g. +91 98765 43210." };
+      }
+      return PHONE_RE.test(digits) ? { value: `+${digits}` } : { error: "That number doesn't look right. Include your country code, e.g. +91 98765 43210." };
     }
   }
 }
@@ -189,8 +199,11 @@ export function hrefFor(link: Pick<LinkItem, "type" | "value">): string | null {
     }
     case "email":
       return EMAIL_RE.test(value) ? `mailto:${value}` : null;
-    case "phone":
-      return PHONE_RE.test(value) ? `https://wa.me/${value}` : null;
+    case "phone": {
+      // Stored as "+<digits>" (older cards stored bare digits).
+      const digits = value.replace(/^\+/, "");
+      return PHONE_RE.test(digits) ? `https://wa.me/${digits}` : null;
+    }
   }
 }
 
@@ -204,7 +217,7 @@ export function displayValue(link: Pick<LinkItem, "type" | "value">): string {
     return link.value;
   }
   if (spec.kind === "phone") {
-    return `+${link.value}`;
+    return `+${link.value.replace(/^\+/, "")}`;
   }
   if (spec.kind === "handle" && !/^https:\/\//i.test(link.value)) {
     return link.type === "linkedin" ? `in/${link.value}` : `@${link.value}`;
