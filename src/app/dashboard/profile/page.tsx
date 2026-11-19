@@ -294,7 +294,7 @@ export default function ProfileEditorPage() {
               id="p-headline"
               className="field"
               maxLength={120}
-              placeholder="Android developer · Community builder"
+              placeholder="e.g. Product Designer at Northwind"
               value={draft.headline}
               onChange={(e) => set("headline", e.target.value)}
             />

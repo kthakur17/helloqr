@@ -58,6 +58,25 @@ export default function OverviewPage() {
         <p className="mt-1 text-muted">Here&apos;s how your card is doing.</p>
       </div>
 
+      {todo.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-[1.25rem] bg-tamago/30 p-4 sm:flex-row sm:items-center sm:gap-5 sm:px-6">
+          <p className="shrink-0 font-display font-bold text-ink">Finish your card</p>
+          <ul className="flex flex-wrap gap-2">
+            {todo.map((item) => (
+              <li key={item}>
+                <Link
+                  href="/dashboard/profile"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-sm font-medium text-ink shadow-[var(--tile-shadow)] transition-colors hover:bg-surface-2"
+                >
+                  {item}
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {loadError && (
         <p role="alert" className="rounded-xl bg-warn-soft p-3 text-sm font-medium text-warn">
           Couldn&apos;t load your stats right now.
@@ -152,14 +171,6 @@ export default function OverviewPage() {
                 <span className="block font-display text-[2.75rem] leading-none font-extrabold tracking-[-0.03em] tabular-nums">{shared}</span>
                 <span className="mt-1 block text-sm opacity-75">{shared === 1 ? "person sent you their details" : "people sent you their details"}</span>
               </span>
-            </Link>
-          ) : todo.length > 0 ? (
-            <Link href="/dashboard/profile" className="tile-hover group flex min-h-40 flex-col justify-between rounded-[1.25rem] bg-tamago/40 p-6 text-ink">
-              <span className="flex items-start justify-between">
-                <span className="text-[0.8rem] font-medium tracking-[0.03em] uppercase opacity-70">Finish your card</span>
-                <ArrowTile />
-              </span>
-              <span className="text-sm font-medium">{todo[0]}</span>
             </Link>
           ) : (
             <Link href="/dashboard/qr" className="panel tile-hover group flex min-h-40 flex-col justify-between p-6 text-ink">

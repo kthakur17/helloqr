@@ -124,6 +124,31 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, max
   return lines;
 }
 
+/**
+ * Wraps into the same number of lines as `wrap`, but as evenly as possible, so a headline never
+ * ends with one stranded word ("… Community / Builder").
+ */
+function balancedWrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+  const greedy = wrap(ctx, text, maxWidth, maxLines);
+  const natural = wrap(ctx, text, maxWidth, 99);
+  if (greedy.length < 2 || natural.length > maxLines) {
+    return greedy;
+  }
+  let lo = maxWidth * 0.3;
+  let hi = maxWidth;
+  for (let i = 0; i < 14; i++) {
+    const mid = (lo + hi) / 2;
+    const attempt = wrap(ctx, text, mid, 99);
+    const fits = attempt.length === natural.length && attempt.every((l) => ctx.measureText(l).width <= mid);
+    if (fits) {
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+  return wrap(ctx, text, hi, maxLines);
+}
+
 /** Cover-fits the (square) photo, or the accent colour with initials, into any rectangle. */
 function photoRect(ctx: CanvasRenderingContext2D, card: Pick<PersonCard, "photo" | "initials" | "accent">, x: number, y: number, w: number, h: number) {
   if (card.photo) {
@@ -209,7 +234,9 @@ function icon(ctx: CanvasRenderingContext2D, type: LinkType, x: number, y: numbe
 function iconRow(ctx: CanvasRenderingContext2D, types: LinkType[], x: number, y: number, size: number, gap: number, maxWidth: number, p: ReturnType<typeof palette>, align: "left" | "center") {
   const unique = [...new Set(types)];
   const fit = Math.max(1, Math.floor((maxWidth + gap) / (size + gap)));
-  const shown = unique.slice(0, fit);
+  // Icons on paper can't be tapped; they only say where to find you, so the first six (in the
+  // owner's order) are enough and keep the row calm.
+  const shown = unique.slice(0, Math.min(fit, 6));
   const rowW = shown.length * size + (shown.length - 1) * gap;
   const start = align === "center" ? x - rowW / 2 : x;
   shown.forEach((type, i) => icon(ctx, type, start + i * (size + gap), y, size, p));
@@ -271,7 +298,7 @@ function layoutText(
     const nameSize = fittedName.size;
     const headlineSize = sizes.headline * scale;
     ctx.font = `400 ${headlineSize}px ${sans()}`;
-    const headlineLines = card.headline ? wrap(ctx, card.headline, width, headlineMax) : [];
+    const headlineLines = card.headline ? balancedWrap(ctx, card.headline, width, headlineMax) : [];
     let roles = "";
     let rolesSize = sizes.roles * scale;
     if (withRoles && card.roles.length) {
@@ -429,7 +456,7 @@ export function renderPocketCard(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - marginR;
   const qy = Math.round((H - side) / 2) - 28;
   qrBlock(ctx, card, card.style, qx, qy, side);
-  scanSignoff(ctx, qx + side / 2, qy + side + 52, 15, p.faint, p.ink, card.style === "dark" ? "#0a0a0a" : "#ffffff");
+  scanSignoff(ctx, qx + side / 2, qy + side + 52, 15, p.muted, p.ink, card.style === "dark" ? "#0a0a0a" : "#ffffff");
 
   const left = panel ? panelW + 48 : 76;
   const colW = qx - (panel ? 44 : 56) - left;
@@ -519,7 +546,7 @@ export function renderPoster(canvas: HTMLCanvasElement, card: PersonCard) {
   const side = Math.max(420, Math.min(620, H - reserved - (y + 30)));
   const qy = Math.min(y + 30, H - reserved - side);
   qrBlock(ctx, card, card.style, (W - side) / 2, qy, side);
-  scanSignoff(ctx, W / 2, qy + side + 70, 24, p.faint, p.ink, card.style === "dark" ? "#0a0a0a" : "#ffffff");
+  scanSignoff(ctx, W / 2, qy + side + 70, 24, p.muted, p.ink, card.style === "dark" ? "#0a0a0a" : "#ffffff");
 
   linkLine(ctx, card, W / 2, H - 80, 32, "center", W - 200, p.muted);
 }
@@ -612,7 +639,7 @@ function qrTile(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, y: n
     quiet: 2,
     center: card.photoInQr ? { image: card.photo, initials: card.initials, color: card.accent } : null,
   });
-  scanSignoff(ctx, x + w / 2, qy + side + labelSize * 2.4, labelSize, "#9898a8", "#1a1a2e", "#ffffff");
+  scanSignoff(ctx, x + w / 2, qy + side + labelSize * 2.4, labelSize, "#6b6b80", "#1a1a2e", "#ffffff");
 }
 
 const BENTO_PHOTO: Record<PhotoSize, number> = { s: 92, m: 116, l: 140 };
@@ -813,23 +840,13 @@ export function renderPocketSplit(canvas: HTMLCanvasElement, card: PersonCard) {
 
   const left = 64;
   const colW = panelX - left - 52;
-  const iconTopLimit = footerLines(ctx, card, left, H - 56, colW, t, 21, "left");
-  let bottomOfText = iconTopLimit - 14;
-  if (card.linkTypes.length) {
-    const size = 46;
-    glyphRow(ctx, card.linkTypes, left - 8, iconTopLimit - size - 6, size, 2, colW, t, "left");
-    bottomOfText = iconTopLimit - size - 22;
-  }
-
   let top = 58;
   if (card.photoPosition !== "none") {
     const r = SPLIT_RADIUS[card.photoSize];
     avatar(ctx, card, left + r, top + r, r);
     top += r * 2 + 24;
   }
-  const block = layoutText(ctx, card, colW, bottomOfText - top, { name: 46, nameMin: 26, headline: 24, roles: 20 });
-  const textTop = card.photoPosition === "none" ? top + Math.max(0, (bottomOfText - top - block.height) / 2) : top;
-  drawText(ctx, block, left, textTop, t as ReturnType<typeof palette>, "left");
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 56, width: colW, align: "left", big: false, iconSize: 46, footSize: 21, center: card.photoPosition === "none" });
 }
 
 /** Business card on one soft gradient with the code on a floating white card. */
@@ -850,23 +867,13 @@ export function renderPocketAurora(canvas: HTMLCanvasElement, card: PersonCard) 
 
   const left = 68;
   const colW = qx - left - 56;
-  const iconTopLimit = footerLines(ctx, card, left, H - 56, colW, t, 21, "left");
-  let bottomOfText = iconTopLimit - 14;
-  if (card.linkTypes.length) {
-    const size = 46;
-    glyphRow(ctx, card.linkTypes, left - 8, iconTopLimit - size - 6, size, 2, colW, { ...t, bg: card.style === "dark" ? "#141424" : "#f3f1f5" }, "left");
-    bottomOfText = iconTopLimit - size - 22;
-  }
-
   let top = 60;
   if (card.photoPosition !== "none") {
     const r = SPLIT_RADIUS[card.photoSize];
     ringedAvatar(ctx, card, left + r, top + r, r, card.style === "dark" ? "rgba(255,255,255,0.14)" : "#ffffff");
     top += r * 2 + 28;
   }
-  const block = layoutText(ctx, card, colW, bottomOfText - top, { name: 46, nameMin: 26, headline: 24, roles: 20 });
-  const textTop = card.photoPosition === "none" ? top + Math.max(0, (bottomOfText - top - block.height) / 2) : top;
-  drawText(ctx, block, left, textTop, t as ReturnType<typeof palette>, "left");
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 56, width: colW, align: "left", big: false, iconSize: 46, footSize: 21, center: card.photoPosition === "none" });
 }
 
 /** Desk card: details on top, the code on a full-width accent band below. */
@@ -983,7 +990,7 @@ export function renderPocketMono(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 64;
   const qy = (H - side - pad * 2) / 2 - 22;
   outlinedQr(ctx, card, qx, qy, side, pad);
-  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.muted, t.ink, t.bg);
 
   const divider = qx - 48;
   ctx.fillStyle = card.style === "dark" ? "#2d2d3d" : "#e8e6e3";
@@ -991,22 +998,13 @@ export function renderPocketMono(canvas: HTMLCanvasElement, card: PersonCard) {
 
   const left = 68;
   const colW = divider - left - 44;
-  const iconTop = footerLines(ctx, card, left, H - 60, colW, t, 20, "left");
-  let bottomOfText = iconTop - 16;
-  if (card.linkTypes.length) {
-    const size = 44;
-    glyphRow(ctx, card.linkTypes, left - 8, iconTop - size - 6, size, 2, colW, t, "left");
-    bottomOfText = iconTop - size - 22;
-  }
-
   let top = 62;
   if (card.photoPosition !== "none") {
     const r = SPLIT_RADIUS[card.photoSize] * 0.78;
     avatar(ctx, card, left + r, top + r, r);
     top += r * 2 + 22;
   }
-  const block = layoutText(ctx, card, colW, bottomOfText - top, { name: 50, nameMin: 26, headline: 23, roles: 19 });
-  drawText(ctx, block, left, top, t as ReturnType<typeof palette>, "left");
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 60, width: colW, align: "left", big: false, iconSize: 44, footSize: 20, center: card.photoPosition === "none" });
 }
 
 /** Typographic desk card. */
@@ -1042,7 +1040,7 @@ export function renderPosterMono(canvas: HTMLCanvasElement, card: PersonCard) {
   const side = Math.max(340, Math.min(500, footerTop - 190 - y - pad * 2));
   const qy = y + Math.max(10, (footerTop - 180 - y - side - pad * 2) / 2);
   outlinedQr(ctx, card, left, qy, side, pad);
-  scanSignoff(ctx, left + side / 2 + pad, qy + side + pad * 2 + 56, 24, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, left + side / 2 + pad, qy + side + pad * 2 + 56, 24, t.muted, t.ink, t.bg);
   footerLines(ctx, card, left, H - 100, colW, t, 30, "left");
 }
 
@@ -1069,6 +1067,43 @@ function footerStack(ctx: CanvasRenderingContext2D, card: PersonCard, t: Tone, x
   }
   glyphRow(ctx, card.linkTypes, align === "left" ? x - iconSize * 0.18 : x, top - iconSize - footSize * 0.3, iconSize, 2, w, t, align);
   return top - iconSize - footSize * 0.9;
+}
+
+/** Height footerStack (or footerLines alone, when iconSize is 0) will use; mirrors their spacing. */
+function footerHeight(card: PersonCard, iconSize: number, footSize: number) {
+  const lines = (card.showLink ? 1 : 0) + (card.contact ? 1 : 0);
+  const linesH = lines * footSize * 1.55 - footSize * 0.2;
+  if (iconSize && card.linkTypes.length) {
+    return linesH + iconSize + footSize * 0.9;
+  }
+  return linesH + (iconSize ? footSize * 0.6 : 0);
+}
+
+/**
+ * Name, headline, roles, then (icons and) contact, kept together as one group: the footer sits a
+ * short gap under the text instead of being pinned to the card's bottom edge, so no hole opens up
+ * between them. With `center`, the whole group is centred in the space (used when there's no photo).
+ */
+function detailsGroup(
+  ctx: CanvasRenderingContext2D,
+  card: PersonCard,
+  t: Tone,
+  opts: { x: number; top: number; bottom: number; width: number; align: "left" | "center"; big: boolean; iconSize: number; footSize: number; center?: boolean },
+) {
+  const { x, top, bottom, width, align, big, iconSize, footSize } = opts;
+  const gap = big ? 56 : 30;
+  const footH = footerHeight(card, iconSize, footSize);
+  const sizes = big ? { name: 80, nameMin: 42, headline: 38, roles: 30 } : { name: 46, nameMin: 26, headline: 23, roles: 19 };
+  const block = layoutText(ctx, card, width, bottom - top - footH - gap, sizes);
+  const groupH = block.height + gap + footH;
+  const offset = opts.center ? Math.max(0, (bottom - top - groupH) / 2) : 0;
+  drawText(ctx, block, x, top + offset, t as ReturnType<typeof palette>, align);
+  const footBottom = Math.min(bottom, top + offset + groupH);
+  if (iconSize) {
+    footerStack(ctx, card, t, x, footBottom, width, align, iconSize, footSize);
+  } else {
+    footerLines(ctx, card, x, footBottom, width, t, footSize, align);
+  }
 }
 
 function textBlock(ctx: CanvasRenderingContext2D, card: PersonCard, t: Tone, x: number, top: number, w: number, maxH: number, big: boolean, align: CanvasTextAlign) {
@@ -1110,18 +1145,18 @@ export function renderPocketCover(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 64;
   const qy = 104;
   whiteQrCard(ctx, card, qx, qy, side, pad, true);
-  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.muted, t.ink, t.bg);
 
   const left = 70;
   const colW = qx - left - 48;
-  const footTop = footerLines(ctx, card, left, H - 54, colW, t, 20, "left");
   let top = band + 34;
   if (card.photoPosition !== "none") {
     const r = COVER_RADIUS[card.photoSize];
     ringedAvatar(ctx, card, left + r, band, r, t.bg);
     top = band + r + 26;
   }
-  textBlock(ctx, card, t, left, top, colW, footTop - 14 - top, false, "left");
+  // Icons sit in the header band here, so the group below carries only text and contact.
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 54, width: colW, align: "left", big: false, iconSize: 0, footSize: 20 });
 }
 
 export function renderPosterCover(canvas: HTMLCanvasElement, card: PersonCard) {
@@ -1153,7 +1188,7 @@ export function renderPosterCover(canvas: HTMLCanvasElement, card: PersonCard) {
   const side = Math.max(320, Math.min(480, footTop - 170 - y - pad * 2));
   const qy = y + Math.max(10, (footTop - 160 - y - side - pad * 2) / 2);
   whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
-  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 46, 22, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 46, 22, t.muted, t.ink, t.bg);
 }
 
 /** The whole card in the accent colour, deepened with a gradient; white type, white QR card. */
@@ -1185,14 +1220,13 @@ export function renderPocketBold(canvas: HTMLCanvasElement, card: PersonCard) {
 
   const left = 68;
   const colW = qx - left - 52;
-  const bottomOfText = footerStack(ctx, card, t, left, H - 56, colW, "left", 46, 21);
   let top = 58;
   if (card.photoPosition !== "none") {
     const r = SPLIT_RADIUS[card.photoSize];
     ringedAvatar(ctx, card, left + r, top + r, r, "rgba(255,255,255,0.35)");
     top += r * 2 + 26;
   }
-  textBlock(ctx, card, t, left, top, colW, bottomOfText - top, false, "left");
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 56, width: colW, align: "left", big: false, iconSize: 46, footSize: 21, center: card.photoPosition === "none" });
 }
 
 export function renderPosterBold(canvas: HTMLCanvasElement, card: PersonCard) {
@@ -1247,18 +1281,17 @@ export function renderPocketFrame(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 76;
   const qy = (H - side - pad * 2) / 2 - 22;
   outlinedQr(ctx, card, qx, qy, side, pad);
-  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.muted, t.ink, t.bg);
 
   const left = 82;
   const colW = qx - left - 50;
-  const bottomOfText = footerStack(ctx, card, t, left, H - 72, colW, "left", 44, 20);
   let top = 72;
   if (card.photoPosition !== "none") {
     const r = SPLIT_RADIUS[card.photoSize] * 0.85;
     avatar(ctx, card, left + r, top + r, r);
     top += r * 2 + 22;
   }
-  textBlock(ctx, card, t, left, top, colW, bottomOfText - top, false, "left");
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 72, width: colW, align: "left", big: false, iconSize: 44, footSize: 20, center: card.photoPosition === "none" });
 }
 
 export function renderPosterFrame(canvas: HTMLCanvasElement, card: PersonCard) {
@@ -1284,7 +1317,7 @@ export function renderPosterFrame(canvas: HTMLCanvasElement, card: PersonCard) {
   const side = Math.max(320, Math.min(480, footTop - 180 - y - pad * 2));
   const qy = y + Math.max(10, (footTop - 170 - y - side - pad * 2) / 2);
   outlinedQr(ctx, card, (W - side - pad * 2) / 2, qy, side, pad);
-  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 50, 22, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 50, 22, t.muted, t.ink, t.bg);
 }
 
 /** Perforation between the main part and the stub, with a notch at each end. */
@@ -1333,14 +1366,13 @@ export function renderPocketTicket(canvas: HTMLCanvasElement, card: PersonCard) 
   const left = 70;
   const colW = stubX - left - 56;
   label(ctx, "Hello, I'm", left, 84, 16, card.accent, "left");
-  const bottomOfText = footerStack(ctx, card, t, left, H - 56, colW, "left", 44, 20);
   let top = 108;
   if (card.photoPosition !== "none") {
     const r = SPLIT_RADIUS[card.photoSize] * 0.8;
     avatar(ctx, card, left + r, top + r, r);
     top += r * 2 + 20;
   }
-  textBlock(ctx, card, t, left, top, colW, bottomOfText - top, false, "left");
+  detailsGroup(ctx, card, t, { x: left, top, bottom: H - 56, width: colW, align: "left", big: false, iconSize: 44, footSize: 20, center: card.photoPosition === "none" });
 }
 
 export function renderPosterTicket(canvas: HTMLCanvasElement, card: PersonCard) {
@@ -1399,7 +1431,7 @@ export function renderPocketSpotlight(canvas: HTMLCanvasElement, card: PersonCar
   const qx = right - box;
   const qy = H - 56 - box - 58;
   outlinedQr(ctx, card, qx, qy, side, pad);
-  scanSignoff(ctx, qx + box / 2, qy + box + 28, 12, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, qx + box / 2, qy + box + 28, 12, t.muted, t.ink, t.bg);
 
   const footW = qx - left - 30;
   const bottomOfFoot = footerStack(ctx, card, t, left, H - 56, footW, "left", 42, 19);
@@ -1430,7 +1462,7 @@ export function renderPosterSpotlight(canvas: HTMLCanvasElement, card: PersonCar
   const box = side + pad * 2;
   const qy = H - 90 - box - 100;
   outlinedQr(ctx, card, W - 100 - box, qy, side, pad);
-  scanSignoff(ctx, W - 100 - box / 2, qy + box + 44, 20, t.faint, t.ink, t.bg);
+  scanSignoff(ctx, W - 100 - box / 2, qy + box + 44, 20, t.muted, t.ink, t.bg);
   const footW = W - 100 - box - left - 40;
   const bottomOfFoot = footerStack(ctx, card, t, left, H - 90, footW, "left", 64, 28);
   textBlock(ctx, card, t, left, top, W - 200, Math.min(qy, bottomOfFoot) - top - 30, true, "left");
