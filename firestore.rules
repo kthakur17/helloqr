@@ -1,0 +1,178 @@
+rules_version = '2';
+
+// HelloQR data model
+//   users/{uid}                          private: { username, createdAt }  (username is permanent)
+//   users/{uid}/joined/{eventId}         private mirror of events the user joined
+//   users/{uid}/connections/{username}   private: people the user saved
+//   profiles/{username}                  public by username (no listing)
+//   profiles/{username}/counters/{key}   anyone may add exactly 1; only the owner reads
+//   retired/{username}                   usernames of deleted accounts, never reusable
+//   events/{eventId}                     public by id; organiser edits
+//   events/{eventId}/attendees/{uid}     visible to the event's attendees and organiser
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myUsername() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username;
+    }
+
+    function str(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    function reserved(name) {
+      return name in ['about', 'admin', 'api', 'app', 'dashboard', 'e', 'event', 'events', 'help', 'helloqr',
+        'home', 'login', 'logout', 'privacy', 'settings', 'signin', 'signup', 'support', 'terms', 'www'];
+    }
+
+    function validProfile(d) {
+      return d.keys().hasOnly(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'roles', 'links',
+          'accent', 'contactEmail', 'contactPhone', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'roles', 'links',
+          'accent', 'contactEmail', 'contactPhone', 'createdAt', 'updatedAt'])
+        && str(d.displayName, 1, 60)
+        && str(d.headline, 0, 120)
+        && str(d.bio, 0, 400)
+        && str(d.photo, 0, 90000)
+        && str(d.thumb, 0, 8000)
+        && d.roles is list && d.roles.size() <= 6
+        && d.links is list && d.links.size() <= 20
+        && d.accent in ['blue', 'red', 'yellow', 'green', 'purple']
+        && str(d.contactEmail, 0, 120)
+        && str(d.contactPhone, 0, 30)
+        && d.createdAt is int && d.updatedAt is int;
+    }
+
+    function validSnapshot(d) {
+      return str(d.displayName, 1, 60) && str(d.headline, 0, 120) && str(d.thumb, 0, 8000);
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      // Created in the same batch as the profile it points to.
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['username', 'createdAt'])
+        && request.resource.data.username is string
+        && request.resource.data.createdAt is int
+        && getAfter(/databases/$(database)/documents/profiles/$(request.resource.data.username)).data.uid == uid;
+      allow update: if false;
+      // Account deletion removes it together with the profile.
+      allow delete: if signedIn() && request.auth.uid == uid;
+
+      match /joined/{eventId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid
+          && existsAfter(/databases/$(database)/documents/events/$(eventId)/attendees/$(uid))
+          && request.resource.data.keys().hasOnly(['name', 'date', 'joinedAt'])
+          && str(request.resource.data.name, 1, 80)
+          && str(request.resource.data.date, 0, 10)
+          && request.resource.data.joinedAt is int;
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
+
+      match /connections/{username} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['displayName', 'headline', 'thumb', 'eventId', 'eventName', 'note', 'savedAt'])
+          && validSnapshot(request.resource.data)
+          && str(request.resource.data.eventId, 0, 40)
+          && str(request.resource.data.eventName, 0, 80)
+          && str(request.resource.data.note, 0, 300)
+          && request.resource.data.savedAt is int;
+      }
+    }
+
+    match /profiles/{username} {
+      allow get: if true;
+      allow list: if false;
+      // One profile per account: the user doc must not exist yet and is created in the same batch.
+      allow create: if signedIn()
+        && username.matches('^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$')
+        && !reserved(username)
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username
+        && !exists(/databases/$(database)/documents/retired/$(username))
+        && validProfile(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validProfile(request.resource.data);
+      // Only together with retiring the username, so printed codes never point at someone new.
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/retired/$(username));
+
+      match /counters/{key} {
+        allow read: if signedIn() && get(/databases/$(database)/documents/profiles/$(username)).data.uid == request.auth.uid;
+        allow create: if key.matches('^(views|scans|saves|vcard|click_[a-z0-9]{1,16})$')
+          && exists(/databases/$(database)/documents/profiles/$(username))
+          && request.resource.data.keys().hasOnly(['n'])
+          && request.resource.data.n == 1;
+        allow update: if request.resource.data.keys().hasOnly(['n'])
+          && request.resource.data.n == resource.data.n + 1;
+        allow delete: if signedIn() && get(/databases/$(database)/documents/profiles/$(username)).data.uid == request.auth.uid;
+      }
+    }
+
+    // Usernames of deleted accounts: kept forever so nobody else can claim a printed link.
+    match /retired/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && get(/databases/$(database)/documents/profiles/$(username)).data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['retiredAt'])
+        && request.resource.data.retiredAt is int;
+      allow update, delete: if false;
+    }
+
+    match /events/{eventId} {
+      function validEvent(d) {
+        return d.keys().hasOnly(['name', 'date', 'venue', 'description', 'organiserUid', 'open', 'createdAt'])
+          && str(d.name, 1, 80)
+          && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && str(d.venue, 0, 120)
+          && str(d.description, 0, 500)
+          && d.open is bool
+          && d.createdAt is int;
+      }
+
+      function isOrganiser() {
+        return signedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.organiserUid == request.auth.uid;
+      }
+
+      allow get: if true;
+      allow list: if signedIn() && resource.data.organiserUid == request.auth.uid;
+      allow create: if signedIn()
+        && eventId.matches('^[a-z0-9]{10}$')
+        && request.resource.data.organiserUid == request.auth.uid
+        && validEvent(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.organiserUid == request.auth.uid
+        && request.resource.data.organiserUid == resource.data.organiserUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validEvent(request.resource.data);
+      // Only the organiser, and the app removes the attendee list first (account deletion).
+      allow delete: if signedIn() && resource.data.organiserUid == request.auth.uid;
+
+      match /attendees/{uid} {
+        allow read: if signedIn()
+          && (exists(/databases/$(database)/documents/events/$(eventId)/attendees/$(request.auth.uid)) || isOrganiser());
+        // Joining needs a profile, an open event, and the private joined/ mirror written in the same batch.
+        allow create: if signedIn() && request.auth.uid == uid
+          && get(/databases/$(database)/documents/events/$(eventId)).data.open == true
+          && request.resource.data.keys().hasOnly(['username', 'displayName', 'headline', 'thumb', 'joinedAt'])
+          && request.resource.data.username == myUsername()
+          && validSnapshot(request.resource.data)
+          && request.resource.data.joinedAt is int
+          && existsAfter(/databases/$(database)/documents/users/$(uid)/joined/$(eventId));
+        allow delete: if signedIn() && (request.auth.uid == uid || isOrganiser());
+      }
+    }
+  }
+}
