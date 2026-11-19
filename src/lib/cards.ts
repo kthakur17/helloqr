@@ -31,15 +31,6 @@ export interface PersonCard {
   contact: string;
 }
 
-export interface EventCard {
-  name: string;
-  date: string;
-  venue: string;
-  url: string;
-  displayUrl: string;
-  style: CardStyle;
-}
-
 // ---------- fonts ----------
 
 function cssVar(name: string, fallback: string) {
@@ -49,13 +40,21 @@ function cssVar(name: string, fallback: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-const sans = () => cssVar("--font-inter", "sans-serif");
-const display = () => cssVar("--font-jakarta", "sans-serif");
-// Addresses are set in the body face; a separate monospace would be a third font to load.
-const mono = sans;
+/** The owner's chosen font style; null means the site's own fonts. */
+let fontChoice: { heading: string; headingWeight: number; body: string } | null = null;
+
+export function setCardFont(font: { heading: string; headingWeight: number; body: string } | null) {
+  fontChoice = font;
+}
+
+const sans = () => fontChoice?.body ?? cssVar("--font-inter", "sans-serif");
+const display = () => fontChoice?.heading ?? cssVar("--font-jakarta", "sans-serif");
+const nameWeight = () => fontChoice?.headingWeight ?? 800;
+// The HelloQR wordmark keeps the brand font whatever style the card uses.
+const brand = () => cssVar("--font-jakarta", "sans-serif");
 
 export async function loadCardFonts() {
-  const specs = [`400 40px ${sans()}`, `500 40px ${sans()}`, `700 40px ${display()}`, `800 40px ${display()}`];
+  const specs = [`400 40px ${sans()}`, `500 40px ${sans()}`, `${nameWeight()} 40px ${display()}`, `800 40px ${brand()}`];
   await Promise.all(specs.map((spec) => document.fonts.load(spec).catch(() => [])));
 }
 
@@ -267,7 +266,7 @@ function layoutText(
   sizes: { name: number; nameMin: number; headline: number; roles: number },
 ): TextBlock {
   const attempt = (headlineMax: number, withRoles: boolean, scale: number): TextBlock => {
-    const fittedName = fitOrClip(ctx, card.name, display(), 800, sizes.name * scale, sizes.nameMin, width);
+    const fittedName = fitOrClip(ctx, card.name, display(), nameWeight(), sizes.name * scale, sizes.nameMin, width);
     const name = fittedName.text;
     const nameSize = fittedName.size;
     const headlineSize = sizes.headline * scale;
@@ -306,7 +305,7 @@ function drawText(ctx: CanvasRenderingContext2D, block: TextBlock, x: number, to
   ctx.textBaseline = "alphabetic";
   let y = top + block.nameSize * 0.82;
   ctx.fillStyle = p.ink;
-  ctx.font = `800 ${block.nameSize}px ${display()}`;
+  ctx.font = `${nameWeight()} ${block.nameSize}px ${display()}`;
   setSpacing(ctx, -block.nameSize * 0.03);
   ctx.fillText(block.name, x, y);
   setSpacing(ctx, 0);
@@ -352,39 +351,41 @@ function logoMark(ctx: CanvasRenderingContext2D, x: number, y: number, s: number
   ctx.restore();
 }
 
-/**
- * The card's sign-off line: the HelloQR logo, or the typed link when the owner asked for it.
- * `baseline` is the text baseline either way, so layouts don't care which one is drawn.
- */
-function brandLine(
-  ctx: CanvasRenderingContext2D,
-  card: Pick<PersonCard, "showLink" | "displayUrl">,
-  x: number,
-  baseline: number,
-  size: number,
-  align: CanvasTextAlign,
-  maxW: number,
-  colors: { ink: string; muted: string; cut: string },
-) {
-  ctx.textBaseline = "alphabetic";
-  if (card.showLink) {
-    ctx.textAlign = align;
-    ctx.fillStyle = colors.muted;
-    ctx.fillText(fitOrClip(ctx, card.displayUrl, sans(), 500, size, size * 0.75, maxW).text, x, baseline);
-    return;
-  }
+/** Mark plus "HelloQR" wordmark, sitting on `baseline`. */
+function logoLockup(ctx: CanvasRenderingContext2D, x: number, baseline: number, size: number, align: CanvasTextAlign, ink: string, cut: string) {
   const mark = size * 1.2;
   const gap = size * 0.4;
-  ctx.font = `800 ${size * 1.05}px ${display()}`;
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `800 ${size * 1.05}px ${brand()}`;
   setSpacing(ctx, -size * 0.02);
   const textW = ctx.measureText("HelloQR").width;
   const total = mark + gap + textW;
   const left = align === "center" ? x - total / 2 : align === "right" || align === "end" ? x - total : x;
-  logoMark(ctx, left, baseline - mark * 0.86, mark, colors.ink, colors.cut);
+  logoMark(ctx, left, baseline - mark * 0.86, mark, ink, cut);
   ctx.textAlign = "left";
-  ctx.fillStyle = colors.ink;
+  ctx.fillStyle = ink;
   ctx.fillText("HelloQR", left + mark + gap, baseline);
   setSpacing(ctx, 0);
+}
+
+/** The typed link, only when the owner turned on "Show my link". Returns whether it drew. */
+function linkLine(ctx: CanvasRenderingContext2D, card: Pick<PersonCard, "showLink" | "displayUrl">, x: number, baseline: number, size: number, align: CanvasTextAlign, maxW: number, color: string) {
+  if (!card.showLink) {
+    return false;
+  }
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = color;
+  ctx.fillText(fitOrClip(ctx, card.displayUrl, sans(), 500, size, size * 0.75, maxW).text, x, baseline);
+  return true;
+}
+
+/** "Scan to connect" with the HelloQR logo under it, centred on `cx`. Returns the y below the block. */
+function scanSignoff(ctx: CanvasRenderingContext2D, cx: number, y: number, size: number, labelColor: string, ink: string, cut: string) {
+  label(ctx, "Scan to connect", cx, y, size, labelColor, "center");
+  const baseline = y + size * 3;
+  logoLockup(ctx, cx, baseline, size * 1.3, "center", ink, cut);
+  return baseline + size * 0.6;
 }
 
 // ---------- layouts ----------
@@ -428,7 +429,7 @@ export function renderPocketCard(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - marginR;
   const qy = Math.round((H - side) / 2) - 28;
   qrBlock(ctx, card, card.style, qx, qy, side);
-  label(ctx, "Scan to connect", qx + side / 2, qy + side + 52, 15, p.faint, "center");
+  scanSignoff(ctx, qx + side / 2, qy + side + 52, 15, p.faint, p.ink, card.style === "dark" ? "#0a0a0a" : "#ffffff");
 
   const left = panel ? panelW + 48 : 76;
   const colW = qx - (panel ? 44 : 56) - left;
@@ -438,7 +439,7 @@ export function renderPocketCard(canvas: HTMLCanvasElement, card: PersonCard) {
   let bottomTop = bottom - 22;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  brandLine(ctx, card, left, bottom, 23, "left", colW, { ink: p.ink, muted: p.muted, cut: card.style === "dark" ? "#0a0a0a" : "#ffffff" });
+  linkLine(ctx, card, left, bottom, 23, "left", colW, p.muted);
   if (card.contact) {
     ctx.fillStyle = p.text;
     const contact = fitOrClip(ctx, card.contact, sans(), 400, 26, 20, colW).text;
@@ -514,13 +515,13 @@ export function renderPoster(canvas: HTMLCanvasElement, card: PersonCard) {
   }
 
   // The code takes whatever height is left above the label and address.
-  const reserved = 200;
+  const reserved = 290;
   const side = Math.max(420, Math.min(620, H - reserved - (y + 30)));
   const qy = Math.min(y + 30, H - reserved - side);
   qrBlock(ctx, card, card.style, (W - side) / 2, qy, side);
-  label(ctx, "Scan to connect", W / 2, qy + side + 70, 24, p.faint, "center");
+  scanSignoff(ctx, W / 2, qy + side + 70, 24, p.faint, p.ink, card.style === "dark" ? "#0a0a0a" : "#ffffff");
 
-  brandLine(ctx, card, W / 2, H - 80, 32, "center", W - 200, { ink: p.ink, muted: p.muted, cut: card.style === "dark" ? "#0a0a0a" : "#ffffff" });
+  linkLine(ctx, card, W / 2, H - 80, 32, "center", W - 200, p.muted);
 }
 
 // ---------- bento layouts ----------
@@ -575,7 +576,7 @@ function accentTile(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, 
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  fitLine(ctx, "Let's connect", display(), 800, iconSize * 0.8, 14, w - pad * 2);
+  fitLine(ctx, "Let's connect", display(), nameWeight(), iconSize * 0.8, 14, w - pad * 2);
   ctx.fillText("Let's connect", x + pad, y + h - pad);
 }
 
@@ -599,19 +600,19 @@ function contactTile(ctx: CanvasRenderingContext2D, card: PersonCard, x: number,
   } else {
     label(ctx, "Find me online", x + pad, ty, sizes.url * 0.72, p.faint, "left");
   }
-  brandLine(ctx, card, x + pad, y + h - pad, sizes.url, "left", maxW, { ink: p.ink, muted: p.muted, cut: p.tile });
+  linkLine(ctx, card, x + pad, y + h - pad, sizes.url, "left", maxW, p.muted);
 }
 
 function qrTile(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, y: number, w: number, h: number, radius: number, side: number, labelSize: number) {
   // The code always sits on white, in both styles, for the best scan.
   bentoTile(ctx, x, y, w, h, "#ffffff", radius, card.style);
   const qx = x + (w - side) / 2;
-  const qy = y + (h - side - labelSize * 3.2) / 2;
+  const qy = y + (h - side - labelSize * 6.4) / 2;
   drawQr(ctx, card.url, qx, qy, side, {
     quiet: 2,
     center: card.photoInQr ? { image: card.photo, initials: card.initials, color: card.accent } : null,
   });
-  label(ctx, "Scan to connect", x + w / 2, qy + side + labelSize * 2.4, labelSize, "#9898a8", "center");
+  scanSignoff(ctx, x + w / 2, qy + side + labelSize * 2.4, labelSize, "#9898a8", "#1a1a2e", "#ffffff");
 }
 
 const BENTO_PHOTO: Record<PhotoSize, number> = { s: 92, m: 116, l: 140 };
@@ -713,19 +714,24 @@ function glyphRow(ctx: CanvasRenderingContext2D, types: LinkType[], x: number, y
   iconRow(ctx, types, x, y, size, gap, maxWidth, plain, align);
 }
 
-/** Contact line and address, bottom-up from `bottom`. Returns the y above the block. */
+/**
+ * Contact line (and the link, if the owner asked for it), bottom-up from `bottom`.
+ * The HelloQR logo lives under "Scan to connect", so this corner carries only contact details.
+ * Returns the y above the block.
+ */
 function footerLines(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, bottom: number, maxW: number, t: Tone, size: number, align: CanvasTextAlign) {
-  ctx.textAlign = align;
-  ctx.textBaseline = "alphabetic";
-  brandLine(ctx, card, x, bottom, size, align, maxW, { ink: t.ink, muted: t.muted, cut: t.bg });
-  ctx.textAlign = align;
-  let top = bottom - size * 1.35;
-  if (card.contact) {
-    ctx.fillStyle = t.text;
-    ctx.fillText(fitOrClip(ctx, card.contact, sans(), 500, size * 1.05, size * 0.8, maxW).text, x, bottom - size * 1.8);
-    top -= size * 1.8;
+  let baseline = bottom;
+  if (linkLine(ctx, card, x, baseline, size, align, maxW, t.muted)) {
+    baseline -= size * 1.55;
   }
-  return top;
+  if (card.contact) {
+    ctx.textAlign = align;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = t.text;
+    ctx.fillText(fitOrClip(ctx, card.contact, sans(), 500, size * 1.05, size * 0.8, maxW).text, x, baseline);
+    baseline -= size * 1.55;
+  }
+  return baseline + size * 0.2;
 }
 
 function whiteQrCard(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, y: number, side: number, pad: number, shadow: boolean) {
@@ -803,7 +809,7 @@ export function renderPocketSplit(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = panelX + (W - panelX - side - pad * 2) / 2;
   const qy = (H - side - pad * 2) / 2 - 26;
   whiteQrCard(ctx, card, qx, qy, side, pad, false);
-  label(ctx, "Scan to connect", panelX + (W - panelX) / 2, qy + side + pad * 2 + 44, 15, "rgba(255,255,255,0.85)", "center");
+  scanSignoff(ctx, panelX + (W - panelX) / 2, qy + side + pad * 2 + 44, 15, "rgba(255,255,255,0.85)", "#ffffff", card.accent);
 
   const left = 64;
   const colW = panelX - left - 52;
@@ -840,7 +846,7 @@ export function renderPocketAurora(canvas: HTMLCanvasElement, card: PersonCard) 
   const qx = W - side - pad * 2 - 64;
   const qy = (H - side - pad * 2) / 2 - 24;
   whiteQrCard(ctx, card, qx, qy, side, pad, true);
-  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 42, 15, t.muted, "center");
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 42, 15, t.muted, t.ink, t.bg);
 
   const left = 68;
   const colW = qx - left - 56;
@@ -882,11 +888,11 @@ export function renderPosterSplit(canvas: HTMLCanvasElement, card: PersonCard) {
   ctx.fillStyle = sheen;
   ctx.fillRect(0, bandY, W, H - bandY);
 
-  const side = 520;
-  const pad = 34;
-  const qy = bandY + 70;
+  const side = 470;
+  const pad = 32;
+  const qy = bandY + 48;
   whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, false);
-  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 70, 26, "rgba(255,255,255,0.88)", "center");
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 62, 26, "rgba(255,255,255,0.88)", "#ffffff", card.accent);
 
   let top = 110;
   if (card.photoPosition !== "none") {
@@ -931,10 +937,10 @@ export function renderPosterAurora(canvas: HTMLCanvasElement, card: PersonCard) 
 
   const footerTop = H - 90 - (card.contact ? 52 : 0);
   const pad = 36;
-  const side = Math.max(380, Math.min(540, footerTop - 120 - y - pad * 2));
-  const qy = y + Math.max(20, (footerTop - 110 - y - side - pad * 2) / 2);
+  const side = Math.max(360, Math.min(520, footerTop - 200 - y - pad * 2));
+  const qy = y + Math.max(20, (footerTop - 190 - y - side - pad * 2) / 2);
   whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
-  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 60, 24, t.muted, "center");
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 60, 24, t.muted, t.ink, t.bg);
   footerLines(ctx, card, W / 2, H - 90, W - 200, t, 30, "center");
 }
 
@@ -977,7 +983,7 @@ export function renderPocketMono(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 64;
   const qy = (H - side - pad * 2) / 2 - 22;
   outlinedQr(ctx, card, qx, qy, side, pad);
-  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, "center");
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, t.ink, t.bg);
 
   const divider = qx - 48;
   ctx.fillStyle = card.style === "dark" ? "#2d2d3d" : "#e8e6e3";
@@ -1033,10 +1039,10 @@ export function renderPosterMono(canvas: HTMLCanvasElement, card: PersonCard) {
 
   const footerTop = H - 100 - (card.contact ? 52 : 0);
   const pad = 30;
-  const side = Math.max(360, Math.min(520, footerTop - 110 - y - pad * 2));
-  const qy = y + Math.max(10, (footerTop - 100 - y - side - pad * 2) / 2);
+  const side = Math.max(340, Math.min(500, footerTop - 190 - y - pad * 2));
+  const qy = y + Math.max(10, (footerTop - 180 - y - side - pad * 2) / 2);
   outlinedQr(ctx, card, left, qy, side, pad);
-  label(ctx, "Scan to connect", left, qy + side + pad * 2 + 56, 24, t.faint, "left");
+  scanSignoff(ctx, left + side / 2 + pad, qy + side + pad * 2 + 56, 24, t.faint, t.ink, t.bg);
   footerLines(ctx, card, left, H - 100, colW, t, 30, "left");
 }
 
@@ -1104,7 +1110,7 @@ export function renderPocketCover(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 64;
   const qy = 104;
   whiteQrCard(ctx, card, qx, qy, side, pad, true);
-  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, "center");
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, t.ink, t.bg);
 
   const left = 70;
   const colW = qx - left - 48;
@@ -1144,10 +1150,10 @@ export function renderPosterCover(canvas: HTMLCanvasElement, card: PersonCard) {
   }
   const footTop = footerLines(ctx, card, W / 2, H - 80, W - 200, t, 30, "center");
   const pad = 30;
-  const side = Math.max(340, Math.min(500, footTop - 90 - y - pad * 2));
-  const qy = y + Math.max(10, (footTop - 80 - y - side - pad * 2) / 2);
+  const side = Math.max(320, Math.min(480, footTop - 170 - y - pad * 2));
+  const qy = y + Math.max(10, (footTop - 160 - y - side - pad * 2) / 2);
   whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
-  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 46, 22, t.faint, "center");
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 46, 22, t.faint, t.ink, t.bg);
 }
 
 /** The whole card in the accent colour, deepened with a gradient; white type, white QR card. */
@@ -1175,7 +1181,7 @@ export function renderPocketBold(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 64;
   const qy = (H - side - pad * 2) / 2 - 24;
   whiteQrCard(ctx, card, qx, qy, side, pad, true);
-  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 42, 15, t.muted, "center");
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 42, 15, t.muted, t.ink, t.bg);
 
   const left = 68;
   const colW = qx - left - 52;
@@ -1210,10 +1216,10 @@ export function renderPosterBold(canvas: HTMLCanvasElement, card: PersonCard) {
   }
   const footTop = footerLines(ctx, card, W / 2, H - 90, W - 200, t, 30, "center");
   const pad = 34;
-  const side = Math.max(360, Math.min(520, footTop - 100 - y - pad * 2));
-  const qy = y + Math.max(10, (footTop - 90 - y - side - pad * 2) / 2);
+  const side = Math.max(340, Math.min(500, footTop - 180 - y - pad * 2));
+  const qy = y + Math.max(10, (footTop - 170 - y - side - pad * 2) / 2);
   whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
-  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 54, 24, t.muted, "center");
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 54, 24, t.muted, t.ink, t.bg);
 }
 
 /** A clean card inside a fine accent border. */
@@ -1241,7 +1247,7 @@ export function renderPocketFrame(canvas: HTMLCanvasElement, card: PersonCard) {
   const qx = W - side - pad * 2 - 76;
   const qy = (H - side - pad * 2) / 2 - 22;
   outlinedQr(ctx, card, qx, qy, side, pad);
-  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, "center");
+  scanSignoff(ctx, qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, t.ink, t.bg);
 
   const left = 82;
   const colW = qx - left - 50;
@@ -1275,10 +1281,10 @@ export function renderPosterFrame(canvas: HTMLCanvasElement, card: PersonCard) {
   }
   const footTop = footerLines(ctx, card, W / 2, H - 120, W - 260, t, 30, "center");
   const pad = 26;
-  const side = Math.max(340, Math.min(500, footTop - 100 - y - pad * 2));
-  const qy = y + Math.max(10, (footTop - 90 - y - side - pad * 2) / 2);
+  const side = Math.max(320, Math.min(480, footTop - 180 - y - pad * 2));
+  const qy = y + Math.max(10, (footTop - 170 - y - side - pad * 2) / 2);
   outlinedQr(ctx, card, (W - side - pad * 2) / 2, qy, side, pad);
-  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 50, 22, t.faint, "center");
+  scanSignoff(ctx, W / 2, qy + side + pad * 2 + 50, 22, t.faint, t.ink, t.bg);
 }
 
 /** Perforation between the main part and the stub, with a notch at each end. */
@@ -1322,7 +1328,7 @@ export function renderPocketTicket(canvas: HTMLCanvasElement, card: PersonCard) 
   const qx = stubX + (W - stubX - side - pad * 2) / 2;
   const qy = (H - side - pad * 2) / 2 - 24;
   whiteQrCard(ctx, card, qx, qy, side, pad, false);
-  label(ctx, "Scan to connect", stubX + (W - stubX) / 2, qy + side + pad * 2 + 40, 14, card.accent, "center");
+  scanSignoff(ctx, stubX + (W - stubX) / 2, qy + side + pad * 2 + 40, 14, card.accent, t.ink, t.bg);
 
   const left = 70;
   const colW = stubX - left - 56;
@@ -1364,9 +1370,9 @@ export function renderPosterTicket(canvas: HTMLCanvasElement, card: PersonCard) 
   const pad = 30;
   const side = 440;
   const box = side + pad * 2;
-  const qy = stubY + (H - stubY - box - 70) / 2;
+  const qy = stubY + (H - stubY - box - 150) / 2;
   whiteQrCard(ctx, card, (W - box) / 2, qy, side, pad, false);
-  label(ctx, "Scan to connect", W / 2, qy + box + 50, 24, card.accent, "center");
+  scanSignoff(ctx, W / 2, qy + box + 50, 24, card.accent, t.ink, t.bg);
 }
 
 /** Photo-forward: a full-height portrait down the left, details and a compact code beside it. */
@@ -1387,12 +1393,13 @@ export function renderPocketSpotlight(canvas: HTMLCanvasElement, card: PersonCar
 
   const left = panelW + 56;
   const right = W - 56;
-  const side = 168;
+  const side = 160;
   const pad = 12;
   const box = side + pad * 2;
   const qx = right - box;
-  const qy = H - 56 - box;
+  const qy = H - 56 - box - 58;
   outlinedQr(ctx, card, qx, qy, side, pad);
+  scanSignoff(ctx, qx + box / 2, qy + box + 28, 12, t.faint, t.ink, t.bg);
 
   const footW = qx - left - 30;
   const bottomOfFoot = footerStack(ctx, card, t, left, H - 56, footW, "left", 42, 19);
@@ -1419,54 +1426,14 @@ export function renderPosterSpotlight(canvas: HTMLCanvasElement, card: PersonCar
   const left = 100;
   const top = photoH + 80;
   const pad = 22;
-  const side = 300;
+  const side = 290;
   const box = side + pad * 2;
-  const qy = H - 90 - box;
+  const qy = H - 90 - box - 100;
   outlinedQr(ctx, card, W - 100 - box, qy, side, pad);
+  scanSignoff(ctx, W - 100 - box / 2, qy + box + 44, 20, t.faint, t.ink, t.bg);
   const footW = W - 100 - box - left - 40;
   const bottomOfFoot = footerStack(ctx, card, t, left, H - 90, footW, "left", 64, 28);
   textBlock(ctx, card, t, left, top, W - 200, Math.min(qy, bottomOfFoot) - top - 30, true, "left");
-}
-
-export function renderEventPoster(canvas: HTMLCanvasElement, event: EventCard) {
-  const { width: W, height: H } = POSTER;
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d")!;
-  const p = palette(event.style);
-  ctx.fillStyle = p.bg;
-  ctx.fillRect(0, 0, W, H);
-
-  label(ctx, "Who's here", W / 2, 190, 26, p.faint, "center");
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = p.ink;
-  ctx.font = `800 84px ${display()}`;
-  let y = 320;
-  for (const line of wrap(ctx, event.name, W - 200, 2)) {
-    fitLine(ctx, line, display(), 800, 84, 44, W - 200);
-    setSpacing(ctx, -1);
-    ctx.fillText(line, W / 2, y);
-    setSpacing(ctx, 0);
-    y += 98;
-  }
-  const meta = [formatDate(event.date), event.venue].filter(Boolean).join("  ·  ");
-  if (meta) {
-    ctx.fillStyle = p.muted;
-    fitLine(ctx, meta, sans(), 400, 34, 20, W - 240);
-    ctx.fillText(meta, W / 2, y);
-  }
-
-  const side = 640;
-  qrBlock(ctx, { url: event.url, photo: null, initials: "", accent: "#000", photoInQr: false }, event.style, (W - side) / 2, 700, side);
-  ctx.fillStyle = p.text;
-  fitLine(ctx, "Scan to join and see everyone attending", sans(), 400, 32, 20, W - 240);
-  ctx.fillText("Scan to join and see everyone attending", W / 2, 1450);
-
-  ctx.fillStyle = p.muted;
-  fitLine(ctx, event.displayUrl, mono(), 400, 28, 18, W - 200);
-  ctx.fillText(event.displayUrl, W / 2, 1620);
 }
 
 /** Just the code, 1024 px square, for slides, stickers and your own designs. */
@@ -1478,15 +1445,6 @@ export function renderQrOnly(canvas: HTMLCanvasElement, card: Pick<PersonCard, "
     quiet: 3,
     center: card.photoInQr ? { image: card.photo, initials: card.initials, color: card.accent } : null,
   });
-}
-
-export function formatDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) {
-    return iso;
-  }
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement | null> {

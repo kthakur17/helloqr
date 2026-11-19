@@ -85,7 +85,7 @@ export default function AccountPage() {
       <section className="panel p-5 sm:p-6">
         <h2 className="font-semibold text-ink">Download your data</h2>
         <p className="mt-1 text-sm text-muted">
-          A JSON file with your card, its stats, the people you saved and the events you joined or organised.
+          A JSON file with your card, its stats, the people you saved and the details people shared with you.
         </p>
         <button type="button" className="btn btn-ghost btn-sm mt-4" onClick={download} disabled={exporting}>
           {exporting ? "Preparing…" : "Download my data"}
@@ -103,7 +103,6 @@ export default function AccountPage() {
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text">
           <li>your card, photo, links and stats</li>
           <li>the people you saved and your notes, and the details people shared with you</li>
-          <li>your place in every event you joined, and every event you organised (with its attendee list)</li>
           <li>your sign-in</li>
         </ul>
         <p className="mt-3 text-sm text-muted">

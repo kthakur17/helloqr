@@ -12,9 +12,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/#how" className="hidden rounded-lg px-3 py-1.5 text-sm text-muted hover:text-ink sm:block">
               How it works
             </Link>
-            <Link href="/#events" className="hidden rounded-lg px-3 py-1.5 text-sm text-muted hover:text-ink sm:block">
-              Events
-            </Link>
             <ThemeToggle />
             <Link href="/dashboard" className="ml-1 rounded-lg px-3 py-1.5 text-sm text-ink hover:bg-surface-2">
               Sign in

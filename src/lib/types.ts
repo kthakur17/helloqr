@@ -1,20 +1,35 @@
-export const ACCENTS = ["blue", "red", "yellow", "green", "purple"] as const;
+// Picker order runs around the colour wheel. Keys are stored on profiles and listed in firestore.rules.
+export const ACCENTS = ["slate", "indigo", "blue", "sky", "teal", "green", "yellow", "orange", "brown", "red", "pink", "purple"] as const;
 export type Accent = (typeof ACCENTS)[number];
 
-// Stored keys are fixed by firestore.rules; the shades are muted so cards stay professional.
+// Muted shades so cards stay professional; every one keeps white text above 4.5:1 contrast.
 export const ACCENT_HEX: Record<Accent, string> = {
+  slate: "#475569",
+  indigo: "#4338ca",
   blue: "#2563eb",
-  red: "#be123c",
-  yellow: "#b45309",
+  sky: "#0369a1",
+  teal: "#0f766e",
   green: "#047857",
+  yellow: "#b45309",
+  orange: "#c2410c",
+  brown: "#7c4a2d",
+  red: "#be123c",
+  pink: "#be185d",
   purple: "#6d28d9",
 };
 
 export const ACCENT_LABEL: Record<Accent, string> = {
+  slate: "Slate",
+  indigo: "Indigo",
   blue: "Blue",
-  red: "Crimson",
-  yellow: "Amber",
+  sky: "Sky",
+  teal: "Teal",
   green: "Emerald",
+  yellow: "Amber",
+  orange: "Orange",
+  brown: "Cocoa",
+  red: "Crimson",
+  pink: "Pink",
   purple: "Violet",
 };
 
@@ -93,14 +108,6 @@ export interface EventDoc {
   /** Closed events keep their attendee list but accept no new joins. */
   open: boolean;
   createdAt: number;
-}
-
-export interface Attendee {
-  username: string;
-  displayName: string;
-  headline: string;
-  thumb: string;
-  joinedAt: number;
 }
 
 export interface JoinedEvent {

@@ -52,11 +52,6 @@ export default function PrivacyPage() {
             your email if you choose to leave it. Only the person running HelloQR reads it.
           </li>
           <li>
-            <strong>Events:</strong> an event&apos;s name, date, venue and description are visible to anyone with the event link. Its
-            attendee list (name, headline, small photo and HelloQR link) is visible only to people who joined and to the organiser,
-            who can export it.
-          </li>
-          <li>
             <strong>Technical data:</strong> our hosting providers process IP addresses and request logs to run the service and keep
             it secure; to stop spam, the &ldquo;Share your details&rdquo; form briefly keeps a count of submissions per IP address in
             memory, which is never stored. Your browser stores your QR-page settings, a short-lived note so one visit isn&apos;t
@@ -71,7 +66,7 @@ export default function PrivacyPage() {
       <section>
         <h2>How we use it</h2>
         <p>
-          Only to run HelloQR: showing your card, letting people save your contact, showing your stats, and running events. We{" "}
+          Only to run HelloQR: showing your card, letting people save your contact or send you theirs, and showing your stats. We{" "}
           <strong>do not sell</strong> your data, show ads, or share it with anyone except the providers below that host the service.
         </p>
       </section>

@@ -25,7 +25,6 @@ export function SaveToHelloQR({
   thumb: string;
 }) {
   const [state, setState] = useState<State>({ kind: "idle" });
-  const [eventId, setEventId] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const autoStarted = useRef(false);
@@ -44,7 +43,6 @@ export function SaveToHelloQR({
         setState({ kind: "self" });
         return;
       }
-      setEventId(ctx.existing?.eventId || flow.defaultEventId(ctx.joined));
       setNote(ctx.existing?.note ?? "");
       setState({ kind: "open", ctx });
     } catch (error) {
@@ -69,13 +67,10 @@ export function SaveToHelloQR({
     setSaving(true);
     try {
       const flow = await import("@/lib/connectFlow");
-      const event = ctx.joined.find((e) => e.id === eventId);
       await flow.saveContact(ctx, username, {
         displayName,
         headline,
         thumb,
-        eventId: event ? event.id : "",
-        eventName: event ? event.name : "",
         note: note.trim().slice(0, 300),
       });
       setState({ kind: "saved" });
@@ -113,17 +108,6 @@ export function SaveToHelloQR({
           }}
         >
           <p className="font-medium text-ink">{state.ctx.existing ? "Update saved contact" : `Save ${firstName} to your connections`}</p>
-          <label className="label mt-3" htmlFor="met-at">
-            Where did you meet?
-          </label>
-          <select id="met-at" className="field" value={eventId} onChange={(e) => setEventId(e.target.value)}>
-            <option value="">Not at an event</option>
-            {state.ctx.joined.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name} {ev.date ? `· ${ev.date}` : ""}
-              </option>
-            ))}
-          </select>
           <label className="label mt-3" htmlFor="note">
             Note (only you see this)
           </label>

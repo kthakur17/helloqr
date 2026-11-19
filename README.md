@@ -4,7 +4,7 @@ One printable QR code for every profile you have. People scan it, see who you ar
 your LinkedIn, GitHub, X and the rest. The links are the official `https://` profile addresses, so phones
 open them in the installed app.
 
-A digital business card for professionals and founders, with an event mode for conferences, meetups and demo days.
+A digital business card for professionals and founders.
 
 ## Features
 
@@ -13,13 +13,17 @@ A digital business card for professionals and founders, with an event mode for c
   fast on venue Wi-Fi.
 - **Dashboard**: profile editor with live preview, drag/arrow reordering, and stats for views, QR scans,
   contact downloads, saves and taps per link.
-- **QR & print**: business card (3.5 × 2 in), A6 desk card and plain QR (PNG or SVG), in Light or Dark,
-  with an optional photo in the middle of the code. The code points to `/<username>?s=qr`,
-  so editing the card never needs a reprint.
-- **Event mode**: an organiser creates an event and downloads its QR poster. Attendees join and see a
-  searchable list of everyone there, and can save each other in one tap. Saved connections remember where
-  you met. Organisers can export the attendee list as CSV, remove people, and close the event.
-- **Connections**: private list of people you saved, filterable by event, with notes and CSV export.
+- **QR & print**: ten designs (Split, Aurora, Mono, Cover, Bold, Frame, Ticket, Spotlight, Bento,
+  Classic) as a business card (3.5 × 2 in) or A6 desk card, plus the plain QR (PNG or SVG), in Light or
+  Dark and twelve accent colours. Cards sign off with the HelloQR logo under the code; the typed link is
+  optional. The code points to `/<username>?s=qr`, so editing the card never needs a reprint.
+- **Show my QR**: full-screen code for holding up to a camera; installable and works offline.
+- **Contact exchange**: visitors can send their details from a card without an account.
+- **Connections**: private list of people you saved and details people shared with you, with notes and CSV export.
+- **Feedback**, light/dark theme toggle, data export and account deletion.
+
+Event mode (event pages, attendee lists) was removed in November 2026. Its Firestore rules and the
+cleanup in account deletion remain so data created while it existed can still be exported and deleted.
 
 ## Design
 
@@ -77,9 +81,11 @@ production domain to Firebase's authorised domains.
 | `profiles/{username}` | anyone with the username | cannot be listed or browsed |
 | `profiles/{username}/counters/{key}` | owner | anyone may add exactly +1 |
 | `users/{uid}` | owner | username is permanent |
-| `users/{uid}/connections/*`, `users/{uid}/joined/*` | owner | |
-| `events/{id}` | anyone with the link | organiser edits; events are closed, never deleted |
-| `events/{id}/attendees/*` | that event's attendees and organiser | |
+| `users/{uid}/connections/*` | owner | |
+| `profiles/{username}/leads/*` | owner | details visitors sent; created via `/api/lead` |
+| `feedback/{id}` | nobody (console only) | created via `/api/feedback` |
+| `retired/{username}` | anyone | usernames of deleted accounts, never reused |
+| `events/*`, `users/{uid}/joined/*` | as before | legacy from the removed event mode |
 
 `firestore.rules` is the security boundary; the client checks only give friendly error messages.
 Stored link values are re-validated before they are rendered, so a `javascript:` URL written straight to
@@ -88,7 +94,7 @@ Firestore never becomes a link.
 ## Known limits
 
 - **The security rules have only been checked signed-out** (8 probes against the live project) plus
-  the owner's own sign-in and card claim. Multi-user flows (joining an event, saving someone) still need
+  the owner's own sign-in and card claim. Multi-user flows (saving someone, contact exchange) still need
   a two-account test. The emulator needs Java, which isn't installed on the dev machine.
 - Counters can be inflated by anyone who calls the endpoint repeatedly. They are for interest, not
   billing. Firebase App Check would harden them.

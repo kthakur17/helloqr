@@ -26,7 +26,6 @@ export default function ConnectionsPage() {
   const [shared, setShared] = useState<Shared[] | null>(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [eventFilter, setEventFilter] = useState("all");
 
   useEffect(() => {
     listConnections(user.uid)
@@ -37,21 +36,10 @@ export default function ConnectionsPage() {
       .catch(() => setError("Couldn't load the details people shared with you."));
   }, [user.uid, username]);
 
-  const events = useMemo(() => {
-    const map = new Map<string, string>();
-    saved?.forEach((r) => r.eventId && map.set(r.eventId, r.eventName));
-    return [...map];
-  }, [saved]);
-
   const q = search.trim().toLowerCase();
   const savedRows = useMemo(
-    () =>
-      (saved ?? []).filter(
-        (r) =>
-          (eventFilter === "all" || (eventFilter === "none" ? !r.eventId : r.eventId === eventFilter)) &&
-          (!q || `${r.displayName} ${r.headline} ${r.username} ${r.note}`.toLowerCase().includes(q)),
-      ),
-    [saved, eventFilter, q],
+    () => (saved ?? []).filter((r) => !q || `${r.displayName} ${r.headline} ${r.username} ${r.note}`.toLowerCase().includes(q)),
+    [saved, q],
   );
   const sharedRows = useMemo(
     () => (shared ?? []).filter((r) => !q || `${r.name} ${r.company} ${r.email} ${r.phone} ${r.note}`.toLowerCase().includes(q)),
@@ -144,17 +132,6 @@ export default function ConnectionsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        {tab === "saved" && (
-          <select className="field w-auto" aria-label="Filter by event" value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}>
-            <option value="all">All events</option>
-            {events.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-            <option value="none">Not at an event</option>
-          </select>
-        )}
       </div>
 
       {error && (
@@ -176,7 +153,7 @@ export default function ConnectionsPage() {
             {search
               ? "Try another search."
               : tab === "saved"
-                ? "Scan someone's HelloQR and tap “Save to my HelloQR”, or join an event to see who's there."
+                ? "Scan someone's HelloQR and tap “Save to my HelloQR”."
                 : "When someone opens your card, they can tap “Share your details” to send you their name and contact. You can turn this off under Profile → Contact card."}
           </p>
         </div>

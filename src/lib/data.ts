@@ -8,12 +8,11 @@ import {
   orderBy,
   query,
   setDoc,
-  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { Attendee, Connection, EventDoc, JoinedEvent, Lead, Profile } from "@/lib/types";
+import type { Connection, EventDoc, JoinedEvent, Lead, Profile } from "@/lib/types";
 
 export async function getMyUsername(uid: string): Promise<string | null> {
   const snap = await getDoc(doc(db(), "users", uid));
@@ -54,28 +53,9 @@ export async function getCounters(username: string): Promise<Record<string, numb
   return out;
 }
 
-// ---------- events ----------
-
-export function newEventId(): string {
-  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
-}
-
-export async function createEvent(event: EventDoc): Promise<string> {
-  const id = newEventId();
-  await setDoc(doc(db(), "events", id), event);
-  return id;
-}
-
-export async function getEvent(eventId: string): Promise<EventDoc | null> {
-  const snap = await getDoc(doc(db(), "events", eventId));
-  return snap.exists() ? (snap.data() as EventDoc) : null;
-}
-
-export async function updateEvent(eventId: string, patch: Partial<Pick<EventDoc, "name" | "date" | "venue" | "description" | "open">>) {
-  await updateDoc(doc(db(), "events", eventId), patch);
-}
+// ---------- events (feature removed) ----------
+// Events are no longer offered. These two reads remain so data export and account deletion
+// still cover any event data created while the feature existed.
 
 export async function listMyEvents(uid: string): Promise<(EventDoc & { id: string })[]> {
   const snap = await getDocs(query(collection(db(), "events"), where("organiserUid", "==", uid), orderBy("date", "desc")));
@@ -85,41 +65,6 @@ export async function listMyEvents(uid: string): Promise<(EventDoc & { id: strin
 export async function listJoined(uid: string): Promise<(JoinedEvent & { id: string })[]> {
   const snap = await getDocs(query(collection(db(), "users", uid, "joined"), orderBy("joinedAt", "desc")));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as JoinedEvent) }));
-}
-
-export async function isJoined(uid: string, eventId: string): Promise<boolean> {
-  return (await getDoc(doc(db(), "users", uid, "joined", eventId))).exists();
-}
-
-export async function joinEvent(uid: string, eventId: string, event: EventDoc, username: string, profile: Profile) {
-  const now = Date.now();
-  const batch = writeBatch(db());
-  const attendee: Attendee = {
-    username,
-    displayName: profile.displayName,
-    headline: profile.headline,
-    thumb: profile.thumb,
-    joinedAt: now,
-  };
-  batch.set(doc(db(), "events", eventId, "attendees", uid), attendee);
-  batch.set(doc(db(), "users", uid, "joined", eventId), { name: event.name, date: event.date, joinedAt: now } satisfies JoinedEvent);
-  await batch.commit();
-}
-
-export async function leaveEvent(uid: string, eventId: string) {
-  const batch = writeBatch(db());
-  batch.delete(doc(db(), "events", eventId, "attendees", uid));
-  batch.delete(doc(db(), "users", uid, "joined", eventId));
-  await batch.commit();
-}
-
-export async function listAttendees(eventId: string): Promise<(Attendee & { uid: string })[]> {
-  const snap = await getDocs(query(collection(db(), "events", eventId, "attendees"), orderBy("joinedAt", "desc")));
-  return snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Attendee) }));
-}
-
-export async function removeAttendee(eventId: string, uid: string) {
-  await deleteDoc(doc(db(), "events", eventId, "attendees", uid));
 }
 
 // ---------- details visitors shared with you ----------

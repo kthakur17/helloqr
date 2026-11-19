@@ -14,8 +14,8 @@ export default function TermsPage() {
       <section>
         <h2>The service</h2>
         <p>
-          HelloQR lets you publish a digital business card at a short link with a QR code, save people you meet, and run events where
-          attendees can see each other. It is free and run by {owner.name}. By creating an account you agree to these terms and to
+          HelloQR lets you publish a digital business card at a short link with a QR code, and save the people you meet. It is free
+          and run by {owner.name}. By creating an account you agree to these terms and to
           the <Link href="/privacy">privacy policy</Link>.
         </p>
       </section>
@@ -39,7 +39,7 @@ export default function TermsPage() {
           <li>pretend to be another person or organisation, or claim a username to impersonate them;</li>
           <li>post anything illegal, hateful, sexually explicit, harassing or misleading;</li>
           <li>link to malware, scams or phishing pages;</li>
-          <li>use HelloQR to spam people, or scrape cards or attendee lists in bulk.</li>
+          <li>use HelloQR to spam people, or scrape cards in bulk.</li>
         </ul>
         <p>
           We may remove content, retire a username or close an account that breaks these rules. Where it&apos;s reasonable we&apos;ll
@@ -55,13 +55,6 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section>
-        <h2>Events</h2>
-        <p>
-          Organisers are responsible for their events. If you export an attendee list, use it only to follow up about that event and
-          respect attendees&apos; privacy: don&apos;t add them to mailing lists without their consent or share the list with others.
-        </p>
-      </section>
 
       <section>
         <h2>Availability</h2>

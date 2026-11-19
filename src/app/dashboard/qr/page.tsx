@@ -34,7 +34,9 @@ import {
   renderPosterSpotlight,
   renderPosterTicket,
   renderQrOnly,
+  setCardFont,
 } from "@/lib/cards";
+import { CARD_FONT_KEYS, CARD_FONTS, type CardFontKey, cardFontVariables } from "@/lib/cardFonts";
 import { hrefFor } from "@/lib/links";
 import { qrSvg } from "@/lib/qr";
 import { ACCENT_HEX } from "@/lib/types";
@@ -87,6 +89,7 @@ interface Options {
   showIcons: boolean;
   showContact: boolean;
   showLink: boolean;
+  font: CardFontKey;
 }
 
 const DEFAULTS: Options = {
@@ -102,6 +105,7 @@ const DEFAULTS: Options = {
   showIcons: true,
   showContact: true,
   showLink: false,
+  font: "jakarta",
 };
 
 function Segmented<T extends string>({
@@ -164,6 +168,8 @@ export default function QrStudioPage() {
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Bumped when a font finishes loading, so the canvases redraw with it.
+  const [, setFontTick] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const thumbRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
@@ -194,6 +200,21 @@ export default function QrStudioPage() {
     };
   }, [profile.photo]);
 
+  // Switch the canvas font, then redraw once its files have arrived.
+  const fontKey: CardFontKey = opts.font in CARD_FONTS ? opts.font : "jakarta";
+  useEffect(() => {
+    let active = true;
+    setCardFont(CARD_FONTS[fontKey]);
+    void loadCardFonts().then(() => {
+      if (active) {
+        setFontTick((t) => t + 1);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [fontKey]);
+
   const classic = opts.layout === "classic";
   const position: PhotoPosition = !classic ? (opts.bentoPhoto ? "above" : "none") : opts.design === "poster" ? opts.posterPosition : opts.pocketPosition;
   const card: PersonCard = {
@@ -220,6 +241,7 @@ export default function QrStudioPage() {
     if (!canvas || !ready) {
       return;
     }
+    setCardFont(CARD_FONTS[fontKey]);
     if (opts.design === "qr") {
       renderQrOnly(canvas, card);
       return;
@@ -255,7 +277,7 @@ export default function QrStudioPage() {
   const isCard = opts.design !== "qr";
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${cardFontVariables}`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">QR &amp; print</h1>
@@ -299,6 +321,29 @@ export default function QrStudioPage() {
                 ]}
                 onChange={(v) => set("style", v)}
               />
+
+              <fieldset>
+                <legend className="label">Font</legend>
+                <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Font">
+                  {CARD_FONT_KEYS.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={fontKey === key}
+                      onClick={() => set("font", key)}
+                      className={`rounded-lg border px-1 py-2 text-center transition ${
+                        fontKey === key ? "border-ink bg-surface text-ink" : "border-line text-muted hover:bg-surface-2 hover:text-ink"
+                      }`}
+                    >
+                      <span className="block text-lg leading-none" style={{ fontFamily: CARD_FONTS[key].heading, fontWeight: CARD_FONTS[key].headingWeight }}>
+                        Aa
+                      </span>
+                      <span className="mt-1 block text-[0.68rem] font-medium">{CARD_FONTS[key].label}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
 
               {!classic ? (
                 <Segmented

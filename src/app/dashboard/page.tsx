@@ -133,7 +133,7 @@ export default function OverviewPage() {
             style={{ background: ACCENT_HEX[profile.accent] ?? ACCENT_HEX.blue }}
           >
             <span className="flex items-start justify-between">
-              <span className="text-[0.8rem] font-medium tracking-[0.03em] uppercase opacity-75">At an event?</span>
+              <span className="text-[0.8rem] font-medium tracking-[0.03em] uppercase opacity-75">Meeting someone?</span>
               <ArrowTile />
             </span>
             <span className="font-display text-2xl font-extrabold tracking-[-0.02em]">Show my QR</span>
@@ -162,12 +162,12 @@ export default function OverviewPage() {
               <span className="text-sm font-medium">{todo[0]}</span>
             </Link>
           ) : (
-            <Link href="/dashboard/events" className="panel tile-hover group flex min-h-40 flex-col justify-between p-6 text-ink">
+            <Link href="/dashboard/qr" className="panel tile-hover group flex min-h-40 flex-col justify-between p-6 text-ink">
               <span className="flex items-start justify-between">
-                <span className="text-[0.8rem] font-medium tracking-[0.03em] text-muted uppercase">Events</span>
+                <span className="text-[0.8rem] font-medium tracking-[0.03em] text-muted uppercase">Print</span>
                 <ArrowTile />
               </span>
-              <span className="font-display text-lg font-bold">Run an event and see who&apos;s there</span>
+              <span className="font-display text-lg font-bold">Pick from 10 card designs</span>
             </Link>
           )}
         </div>

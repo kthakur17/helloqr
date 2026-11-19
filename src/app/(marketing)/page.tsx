@@ -131,7 +131,7 @@ export default function HomePage() {
           <div className="panel p-7">
             <Icon d="M7 3h10v18l-5-3-5 3z" />
             <h3 className="mt-5 text-lg font-bold text-ink">People you&apos;ve met</h3>
-            <p className="mt-1.5 text-sm text-muted">Save cards you scan, add a note and remember where you met.</p>
+            <p className="mt-1.5 text-sm text-muted">Save cards you scan and add a note so you remember who&apos;s who.</p>
           </div>
           <div className="rounded-[1.25rem] bg-tamago/35 p-7 sm:col-span-2">
             <Icon d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" />
@@ -141,33 +141,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="events" className="wrap scroll-mt-16 pb-16 sm:pb-24">
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="flex flex-col justify-between gap-10 rounded-[1.25rem] bg-ink p-8 text-bg lg:col-span-2 sm:p-10">
-            <div>
-              <p className="text-xs font-medium tracking-[0.03em] uppercase opacity-60">For events</p>
-              <h2 className="mt-3 max-w-xl text-3xl font-bold sm:text-4xl">Everyone in the room, one scan away.</h2>
-              <p className="mt-4 max-w-xl opacity-75">
-                For conferences, meetups, demo days and offsites. Organisers show one QR; attendees join and see everyone there, with names,
-                titles and cards, and save each other in one tap.
-              </p>
-            </div>
-            <Link href="/dashboard/events" className="btn w-fit bg-bg text-ink hover:opacity-90">
-              Create an event
-            </Link>
+      <section className="wrap pb-16 sm:pb-24">
+        <div className="flex flex-col justify-between gap-8 rounded-[1.25rem] bg-ink p-8 text-bg sm:flex-row sm:items-end sm:p-10">
+          <div>
+            <p className="text-xs font-medium tracking-[0.03em] uppercase opacity-60">Print-ready</p>
+            <h2 className="mt-3 max-w-xl text-3xl font-bold sm:text-4xl">Ten card designs, one code.</h2>
+            <p className="mt-4 max-w-xl opacity-75">
+              Business cards and desk cards in ten designs, light or dark, in your colour. Pick one, download, print.
+            </p>
           </div>
-          <div className="grid gap-4">
-            {[
-              ["Event QR poster", "Print-ready for the registration desk or the screen."],
-              ["Attendee directory", "Visible only to people who joined."],
-              ["Context on every contact", "Saved contacts remember where you met."],
-            ].map(([title, text]) => (
-              <div key={title} className="panel p-6">
-                <h3 className="font-bold text-ink">{title}</h3>
-                <p className="mt-1 text-sm text-muted">{text}</p>
-              </div>
-            ))}
-          </div>
+          <Link href="/dashboard/qr" className="btn w-fit shrink-0 bg-bg text-ink hover:opacity-90">
+            See the designs
+          </Link>
         </div>
       </section>
 
