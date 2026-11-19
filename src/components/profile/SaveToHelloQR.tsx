@@ -89,13 +89,13 @@ export function SaveToHelloQR({
   const firstName = displayName.split(/\s+/)[0];
 
   return (
-    <div className="px-4 pb-5 sm:px-5">
+    <div className="px-6 pb-5 sm:px-8">
       {(state.kind === "idle" || state.kind === "loading") && (
         <button
           type="button"
           onClick={start}
           disabled={state.kind === "loading"}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-line p-3 text-sm font-semibold text-ink transition hover:bg-surface-2"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-line p-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
         >
           <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
             <path d="M12 5v14M5 12h14" strokeLinecap="round" />
@@ -106,13 +106,13 @@ export function SaveToHelloQR({
 
       {state.kind === "open" && (
         <form
-          className="rounded-2xl border border-line-soft bg-surface p-4"
+          className="rounded-xl border border-line-soft bg-surface p-4"
           onSubmit={(e) => {
             e.preventDefault();
             void save(state.ctx);
           }}
         >
-          <p className="font-semibold text-ink">{state.ctx.existing ? "Update saved contact" : `Save ${firstName} to your connections`}</p>
+          <p className="font-medium text-ink">{state.ctx.existing ? "Update saved contact" : `Save ${firstName} to your connections`}</p>
           <label className="label mt-3" htmlFor="met-at">
             Where did you meet?
           </label>
@@ -147,7 +147,7 @@ export function SaveToHelloQR({
       )}
 
       {state.kind === "saved" && (
-        <p className="rounded-2xl bg-success-soft p-3 text-center text-sm font-semibold text-success">
+        <p className="rounded-xl bg-success-soft p-3 text-center text-sm font-medium text-success">
           Saved.{" "}
           <Link href="/dashboard/connections" className="underline">
             See your connections
@@ -156,16 +156,16 @@ export function SaveToHelloQR({
       )}
 
       {state.kind === "self" && (
-        <p className="rounded-2xl bg-surface-2 p-3 text-center text-sm text-muted">
+        <p className="rounded-xl bg-surface-2 p-3 text-center text-sm text-muted">
           This is your card.{" "}
-          <Link href="/dashboard/profile" className="font-semibold text-ink underline">
+          <Link href="/dashboard/profile" className="font-medium text-ink underline">
             Edit it
           </Link>
         </p>
       )}
 
       {state.kind === "error" && (
-        <p role="alert" className="rounded-2xl bg-danger-soft p-3 text-center text-sm font-semibold text-danger">
+        <p role="alert" className="rounded-xl bg-danger-soft p-3 text-center text-sm font-medium text-danger">
           {state.message}{" "}
           <button type="button" className="underline" onClick={() => setState({ kind: "idle" })}>
             Try again

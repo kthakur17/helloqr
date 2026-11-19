@@ -461,6 +461,20 @@ export default function ProfileEditorPage() {
               />
             </Field>
           </div>
+          <label className="flex cursor-pointer items-start gap-3 border-t border-line-soft pt-4">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 accent-ink"
+              checked={draft.acceptLeads !== false}
+              onChange={(e) => set("acceptLeads", e.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium text-ink">Let visitors share their details with you</span>
+              <span className="block text-xs text-muted">
+                Adds a “Share your details” button to your card. What people send appears in Connections → Shared with you.
+              </span>
+            </span>
+          </label>
         </Section>
 
         <Section title="Accent colour" subtitle="Used for the Save contact button and your initials if you have no photo.">

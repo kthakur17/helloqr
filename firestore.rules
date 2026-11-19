@@ -6,6 +6,7 @@ rules_version = '2';
 //   users/{uid}/connections/{username}   private: people the user saved
 //   profiles/{username}                  public by username (no listing)
 //   profiles/{username}/counters/{key}   anyone may add exactly 1; only the owner reads
+//   profiles/{username}/leads/{id}       details visitors sent to the owner; only the owner reads
 //   retired/{username}                   usernames of deleted accounts, never reusable
 //   events/{eventId}                     public by id; organiser edits
 //   events/{eventId}/attendees/{uid}     visible to the event's attendees and organiser
@@ -31,7 +32,7 @@ service cloud.firestore {
 
     function validProfile(d) {
       return d.keys().hasOnly(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'roles', 'links',
-          'accent', 'contactEmail', 'contactPhone', 'createdAt', 'updatedAt'])
+          'accent', 'contactEmail', 'contactPhone', 'acceptLeads', 'createdAt', 'updatedAt'])
         && d.keys().hasAll(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'roles', 'links',
           'accent', 'contactEmail', 'contactPhone', 'createdAt', 'updatedAt'])
         && str(d.displayName, 1, 60)
@@ -44,6 +45,7 @@ service cloud.firestore {
         && d.accent in ['blue', 'red', 'yellow', 'green', 'purple']
         && str(d.contactEmail, 0, 120)
         && str(d.contactPhone, 0, 30)
+        && (!('acceptLeads' in d) || d.acceptLeads is bool)
         && d.createdAt is int && d.updatedAt is int;
     }
 
@@ -107,6 +109,25 @@ service cloud.firestore {
       allow delete: if signedIn()
         && resource.data.uid == request.auth.uid
         && existsAfter(/databases/$(database)/documents/retired/$(username));
+
+      // Details visitors send to the card owner. Created by the server route /api/lead.
+      match /leads/{leadId} {
+        allow read, delete: if signedIn() && get(/databases/$(database)/documents/profiles/$(username)).data.uid == request.auth.uid;
+        allow create: if leadId.matches('^[a-z0-9]{20}$')
+          && exists(/databases/$(database)/documents/profiles/$(username))
+          && get(/databases/$(database)/documents/profiles/$(username)).data.get('acceptLeads', true) == true
+          && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'company', 'linkedin', 'note', 'createdAt'])
+          && request.resource.data.keys().hasAll(['name', 'email', 'phone', 'company', 'linkedin', 'note', 'createdAt'])
+          && str(request.resource.data.name, 1, 80)
+          && str(request.resource.data.email, 0, 120)
+          && str(request.resource.data.phone, 0, 30)
+          && (request.resource.data.email.size() > 0 || request.resource.data.phone.size() > 0)
+          && str(request.resource.data.company, 0, 80)
+          && str(request.resource.data.linkedin, 0, 200)
+          && str(request.resource.data.note, 0, 500)
+          && request.resource.data.createdAt is int;
+        allow update: if false;
+      }
 
       match /counters/{key} {
         allow read: if signedIn() && get(/databases/$(database)/documents/profiles/$(username)).data.uid == request.auth.uid;

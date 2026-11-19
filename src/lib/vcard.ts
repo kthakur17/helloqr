@@ -1,5 +1,5 @@
 import { hrefFor, linkTitle } from "./links.ts";
-import type { Profile } from "./types";
+import type { Lead, Profile } from "./types";
 
 /** RFC 6350 text escaping. */
 export function escapeText(value: string): string {
@@ -33,6 +33,30 @@ function splitName(full: string): { family: string; given: string } {
     return { family: "", given: parts[0] ?? "" };
   }
   return { family: parts[parts.length - 1], given: parts.slice(0, -1).join(" ") };
+}
+
+/** A contact card for someone who shared their details, so the owner can add them to their phone. */
+export function buildLeadVCard(lead: Lead): string {
+  const { family, given } = splitName(lead.name);
+  const lines = ["BEGIN:VCARD", "VERSION:3.0", `FN:${escapeText(lead.name)}`, `N:${escapeText(family)};${escapeText(given)};;;`];
+  if (lead.company) {
+    lines.push(`ORG:${escapeText(lead.company)}`);
+  }
+  if (lead.email) {
+    lines.push(`EMAIL;TYPE=INTERNET:${escapeText(lead.email)}`);
+  }
+  if (lead.phone) {
+    lines.push(`TEL;TYPE=CELL:${escapeText(lead.phone)}`);
+  }
+  const linkedin = lead.linkedin ? hrefFor({ type: "linkedin", value: lead.linkedin }) : null;
+  if (linkedin) {
+    lines.push(`item1.URL:${linkedin}`, "item1.X-ABLabel:LinkedIn");
+  }
+  if (lead.note) {
+    lines.push(`NOTE:${escapeText(lead.note)}`);
+  }
+  lines.push("END:VCARD");
+  return `${lines.map(foldLine).join("\r\n")}\r\n`;
 }
 
 /** vCard 3.0, which both Android and iOS import from a download. */

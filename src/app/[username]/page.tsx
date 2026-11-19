@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ViewBeacon } from "@/components/profile/ProfileActions";
 import { ProfileView } from "@/components/profile/ProfileView";
 import { SaveToHelloQR } from "@/components/profile/SaveToHelloQR";
+import { ShareBack } from "@/components/profile/ShareBack";
 import { getPublicProfile } from "@/lib/firebase/server";
 
 // Edits must show the moment the owner saves, so this page is never cached.
@@ -20,6 +21,7 @@ export async function generateMetadata({ params }: PageProps<"/[username]">): Pr
     description,
     alternates: { canonical: `/${username}` },
     openGraph: { title: `${profile.displayName} · HelloQR`, description, type: "profile", url: `/${username}` },
+    twitter: { card: "summary_large_image", title: `${profile.displayName} · HelloQR`, description },
   };
 }
 
@@ -32,6 +34,7 @@ export default async function PublicProfilePage({ params }: PageProps<"/[usernam
   return (
     <main className="min-h-dvh px-3 py-6 sm:px-4 sm:py-12">
       <ProfileView profile={profile} username={username}>
+        {profile.acceptLeads !== false && <ShareBack username={username} firstName={profile.displayName.split(/\s+/)[0]} />}
         <SaveToHelloQR username={username} displayName={profile.displayName} headline={profile.headline} thumb={profile.thumb} />
       </ProfileView>
       <ViewBeacon username={username} />

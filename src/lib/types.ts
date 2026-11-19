@@ -65,8 +65,22 @@ export interface Profile {
   /** Shown publicly and put in the downloaded contact card when filled in. */
   contactEmail: string;
   contactPhone: string;
+  /** Lets visitors send their own details from the card. Missing on older profiles = on. */
+  acceptLeads?: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+/** Details a visitor chose to send to a card owner; stored at profiles/{username}/leads/{id}. */
+export interface Lead {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  /** A LinkedIn handle or profile URL, normalised like a card link. */
+  linkedin: string;
+  note: string;
+  createdAt: number;
 }
 
 export interface EventDoc {

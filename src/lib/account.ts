@@ -6,17 +6,18 @@ import {
   type User,
 } from "firebase/auth";
 import { collection, doc, getDocs, writeBatch, type DocumentReference } from "firebase/firestore";
-import { getCounters, listConnections, listJoined, listMyEvents } from "@/lib/data";
+import { getCounters, listConnections, listJoined, listLeads, listMyEvents } from "@/lib/data";
 import { db } from "@/lib/firebase/client";
 import type { Profile } from "@/lib/types";
 
 /** Everything HelloQR holds about the signed-in person, as one JSON-ready object. */
 export async function exportAccount(user: User, username: string, profile: Profile) {
-  const [counters, connections, joined, organised] = await Promise.all([
+  const [counters, connections, joined, organised, sharedWithYou] = await Promise.all([
     getCounters(username),
     listConnections(user.uid),
     listJoined(user.uid),
     listMyEvents(user.uid),
+    listLeads(username),
   ]);
   return {
     exportedAt: new Date().toISOString(),
@@ -31,6 +32,7 @@ export async function exportAccount(user: User, username: string, profile: Profi
     card: profile,
     cardStats: counters,
     connections,
+    sharedWithYou,
     eventsJoined: joined,
     eventsOrganised: organised,
   };
@@ -77,7 +79,8 @@ export async function deleteAccount(user: User, username: string, onStep: (step:
 
   onStep("Removing your card");
   const counters = await getDocs(collection(store, "profiles", username, "counters"));
-  await deleteAll(counters.docs.map((d) => d.ref));
+  const leads = await getDocs(collection(store, "profiles", username, "leads"));
+  await deleteAll([...counters.docs, ...leads.docs].map((d) => d.ref));
   const batch = writeBatch(store);
   batch.set(doc(store, "retired", username), { retiredAt: Date.now() });
   batch.delete(doc(store, "profiles", username));
@@ -89,6 +92,7 @@ export async function deleteAccount(user: User, username: string, onStep: (step:
 
   try {
     window.localStorage.removeItem(`hq:print:${username}`);
+    window.localStorage.removeItem("hq:show");
   } catch {
     // Nothing to clean up in private mode.
   }

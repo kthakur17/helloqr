@@ -73,6 +73,7 @@ export function Onboarding({ user }: { user: User }) {
       accent: "blue",
       contactEmail: "",
       contactPhone: "",
+      acceptLeads: true,
       createdAt: now,
       updatedAt: now,
     };

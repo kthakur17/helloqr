@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: { default: site.title, template: "%s · HelloQR" },
   description: site.description,
   openGraph: { title: site.title, description: site.description, siteName: site.name, type: "website" },
-  twitter: { card: "summary", title: site.title, description: site.description },
+  twitter: { card: "summary_large_image", title: site.title, description: site.description },
 };
 
 export const viewport: Viewport = {

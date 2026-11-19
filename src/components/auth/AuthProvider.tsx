@@ -75,6 +75,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      // The offline QR copy belongs to this account; don't leave it on a shared device.
+      window.localStorage.removeItem("hq:show");
+    } catch {
+      // Private mode: nothing was stored.
+    }
     await signOut(auth());
   }, []);
 

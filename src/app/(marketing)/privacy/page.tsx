@@ -43,13 +43,20 @@ export default function PrivacyPage() {
             note. Only you can see this list.
           </li>
           <li>
+            <strong>Details you share with a card owner:</strong> if you use &ldquo;Share your details&rdquo; on someone&apos;s card,
+            the name, contact details, company, LinkedIn and note you enter are sent to that person only. You don&apos;t need an
+            account to do this. To have them removed, ask that person, or email us with the card link.
+          </li>
+          <li>
             <strong>Events:</strong> an event&apos;s name, date, venue and description are visible to anyone with the event link. Its
             attendee list (name, headline, small photo and HelloQR link) is visible only to people who joined and to the organiser,
             who can export it.
           </li>
           <li>
             <strong>Technical data:</strong> our hosting providers process IP addresses and request logs to run the service and keep
-            it secure. Your browser stores your QR-page settings and a short-lived note so one visit isn&apos;t counted twice.
+            it secure; to stop spam, the &ldquo;Share your details&rdquo; form briefly keeps a count of submissions per IP address in
+            memory, which is never stored. Your browser stores your QR-page settings, a short-lived note so one visit isn&apos;t
+            counted twice, and a copy of your own QR details so &ldquo;Show my QR&rdquo; works without a connection.
           </li>
         </ul>
         <p>

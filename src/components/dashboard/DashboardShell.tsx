@@ -40,6 +40,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [state.status, pathname, router]);
 
+  // Full-screen QR: no chrome, and it renders from its offline copy even before the account loads.
+  if (pathname === "/dashboard/show") {
+    return <>{children}</>;
+  }
+
   if (state.status === "unconfigured") {
     return (
       <main className="grid min-h-dvh place-items-center px-4">

@@ -3,6 +3,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getCountFromServer,
   getDocs,
   orderBy,
   query,
@@ -12,7 +13,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import type { Attendee, Connection, EventDoc, JoinedEvent, Profile } from "@/lib/types";
+import type { Attendee, Connection, EventDoc, JoinedEvent, Lead, Profile } from "@/lib/types";
 
 export async function getMyUsername(uid: string): Promise<string | null> {
   const snap = await getDoc(doc(db(), "users", uid));
@@ -39,7 +40,9 @@ export async function claimUsername(uid: string, username: string, profile: Prof
 }
 
 export async function saveProfile(username: string, profile: Profile): Promise<void> {
-  await setDoc(doc(db(), "profiles", username), { ...profile, updatedAt: Date.now() });
+  // Firestore rejects undefined values; optional fields an older card never set are simply left out.
+  const data = Object.fromEntries(Object.entries({ ...profile, updatedAt: Date.now() }).filter(([, v]) => v !== undefined));
+  await setDoc(doc(db(), "profiles", username), data);
 }
 
 export async function getCounters(username: string): Promise<Record<string, number>> {
@@ -117,6 +120,21 @@ export async function listAttendees(eventId: string): Promise<(Attendee & { uid:
 
 export async function removeAttendee(eventId: string, uid: string) {
   await deleteDoc(doc(db(), "events", eventId, "attendees", uid));
+}
+
+// ---------- details visitors shared with you ----------
+
+export async function listLeads(username: string): Promise<(Lead & { id: string })[]> {
+  const snap = await getDocs(query(collection(db(), "profiles", username, "leads"), orderBy("createdAt", "desc")));
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Lead) }));
+}
+
+export async function countLeads(username: string): Promise<number> {
+  return (await getCountFromServer(collection(db(), "profiles", username, "leads"))).data().count;
+}
+
+export async function deleteLead(username: string, id: string) {
+  await deleteDoc(doc(db(), "profiles", username, "leads", id));
 }
 
 // ---------- connections ----------

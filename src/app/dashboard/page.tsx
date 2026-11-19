@@ -6,7 +6,7 @@ import { BrandChip } from "@/components/BrandIcon";
 import { CopyButton } from "@/components/dashboard/CopyButton";
 import { useAccount } from "@/components/dashboard/DashboardShell";
 import { StatTile } from "@/components/dashboard/StatTile";
-import { getCounters } from "@/lib/data";
+import { countLeads, getCounters } from "@/lib/data";
 import { displayValue, linkTitle } from "@/lib/links";
 import { qrSvg } from "@/lib/qr";
 
@@ -15,10 +15,15 @@ export default function OverviewPage() {
   const [counters, setCounters] = useState<Record<string, number> | null>(null);
   const [loadError, setLoadError] = useState(false);
 
+  const [shared, setShared] = useState<number | null>(null);
+
   useEffect(() => {
     getCounters(username)
       .then(setCounters)
       .catch(() => setLoadError(true));
+    countLeads(username)
+      .then(setShared)
+      .catch(() => setShared(0));
   }, [username]);
 
   const origin = window.location.origin;
@@ -60,8 +65,11 @@ export default function OverviewPage() {
             <Link href={`/${username}`} target="_blank" className="btn btn-ghost btn-sm">
               Open card
             </Link>
-            <Link href="/dashboard/qr" className="btn btn-primary btn-sm">
-              Download &amp; print QR
+            <Link href="/dashboard/show" className="btn btn-primary btn-sm">
+              Show my QR
+            </Link>
+            <Link href="/dashboard/qr" className="btn btn-ghost btn-sm">
+              Download &amp; print
             </Link>
           </div>
         </div>
@@ -94,6 +102,19 @@ export default function OverviewPage() {
         <StatTile label="Contacts saved" value={loadError ? 0 : (counters?.vcard ?? (counters ? 0 : null))} hint="Downloads of your contact card" />
         <StatTile label="Saved on HelloQR" value={loadError ? 0 : (counters?.saves ?? (counters ? 0 : null))} hint="People who added you to their connections" />
       </section>
+
+      {shared !== null && shared > 0 && (
+        <Link
+          href="/dashboard/connections?tab=shared"
+          className="panel flex items-center justify-between gap-3 p-4 transition-colors hover:bg-surface-2"
+        >
+          <span className="text-sm text-ink">
+            <span className="font-semibold tabular-nums">{shared}</span> {shared === 1 ? "person has" : "people have"} shared their details
+            with you
+          </span>
+          <span className="text-sm text-muted">View →</span>
+        </Link>
+      )}
 
       <section className="panel p-5 sm:p-6">
         <div className="flex items-center justify-between gap-3">

@@ -48,6 +48,14 @@ export default function TermsPage() {
       </section>
 
       <section>
+        <h2>Details people share with you</h2>
+        <p>
+          When someone sends you their details from your card, use them only to get back in touch with that person. Don&apos;t add
+          them to mailing lists or share them without their consent, and delete them if they ask.
+        </p>
+      </section>
+
+      <section>
         <h2>Events</h2>
         <p>
           Organisers are responsible for their events. If you export an attendee list, use it only to follow up about that event and

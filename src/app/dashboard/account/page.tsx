@@ -102,7 +102,7 @@ export default function AccountPage() {
         <p className="mt-1 text-sm text-text">This permanently deletes, straight away:</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text">
           <li>your card, photo, links and stats</li>
-          <li>the people you saved and your notes</li>
+          <li>the people you saved and your notes, and the details people shared with you</li>
           <li>your place in every event you joined, and every event you organised (with its attendee list)</li>
           <li>your sign-in</li>
         </ul>

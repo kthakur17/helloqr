@@ -1,7 +1,7 @@
 import "server-only";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { doc, getDoc, getFirestore, increment, setDoc } from "firebase/firestore/lite";
-import type { CounterKey, EventDoc, Profile } from "@/lib/types";
+import type { CounterKey, EventDoc, Lead, Profile } from "@/lib/types";
 import { USERNAME_RE } from "@/lib/username";
 
 // The REST-based "lite" SDK reads public documents as an anonymous client, so the same
@@ -36,6 +36,11 @@ export async function getPublicEvent(eventId: string): Promise<EventDoc | null> 
   }
   const snap = await getDoc(doc(db(), "events", eventId));
   return snap.exists() ? (snap.data() as EventDoc) : null;
+}
+
+/** Writes a visitor's details to the card owner's private inbox; the rules re-check every field. */
+export async function addLead(username: string, id: string, lead: Lead): Promise<void> {
+  await setDoc(doc(db(), "profiles", username, "leads", id), lead);
 }
 
 export const COUNTER_KEY_RE = /^(views|scans|saves|vcard|click_[a-z0-9]{1,16})$/;

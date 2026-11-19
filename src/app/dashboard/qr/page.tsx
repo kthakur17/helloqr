@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { initials } from "@/components/Avatar";
 import { useAccount } from "@/components/dashboard/DashboardShell";
@@ -194,9 +195,14 @@ export default function QrStudioPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">QR &amp; print</h1>
-        <p className="mt-1 text-muted">Your code never changes, so you can print it once and keep editing your card.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">QR &amp; print</h1>
+          <p className="mt-1 text-muted">Your code never changes, so you can print it once and keep editing your card.</p>
+        </div>
+        <Link href="/dashboard/show" className="btn btn-ghost btn-sm">
+          Show on this phone
+        </Link>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
