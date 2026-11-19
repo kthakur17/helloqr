@@ -13,10 +13,26 @@ import {
   type PersonCard,
   type PhotoPosition,
   type PhotoSize,
+  renderPocketAurora,
   renderPocketBento,
+  renderPocketBold,
   renderPocketCard,
+  renderPocketCover,
+  renderPocketFrame,
+  renderPocketMono,
+  renderPocketSplit,
+  renderPocketSpotlight,
+  renderPocketTicket,
   renderPoster,
+  renderPosterAurora,
   renderPosterBento,
+  renderPosterBold,
+  renderPosterCover,
+  renderPosterFrame,
+  renderPosterMono,
+  renderPosterSplit,
+  renderPosterSpotlight,
+  renderPosterTicket,
   renderQrOnly,
 } from "@/lib/cards";
 import { hrefFor } from "@/lib/links";
@@ -24,6 +40,33 @@ import { qrSvg } from "@/lib/qr";
 import { ACCENT_HEX } from "@/lib/types";
 
 type Design = "pocket" | "poster" | "qr";
+type Layout = "split" | "aurora" | "mono" | "cover" | "bold" | "frame" | "ticket" | "spotlight" | "bento" | "classic";
+
+const LAYOUTS: { id: Layout; name: string }[] = [
+  { id: "split", name: "Split" },
+  { id: "aurora", name: "Aurora" },
+  { id: "mono", name: "Mono" },
+  { id: "cover", name: "Cover" },
+  { id: "bold", name: "Bold" },
+  { id: "frame", name: "Frame" },
+  { id: "ticket", name: "Ticket" },
+  { id: "spotlight", name: "Spotlight" },
+  { id: "bento", name: "Bento" },
+  { id: "classic", name: "Classic" },
+];
+
+const RENDERERS: Record<Layout, { pocket: (c: HTMLCanvasElement, card: PersonCard) => void; poster: (c: HTMLCanvasElement, card: PersonCard) => void }> = {
+  split: { pocket: renderPocketSplit, poster: renderPosterSplit },
+  aurora: { pocket: renderPocketAurora, poster: renderPosterAurora },
+  mono: { pocket: renderPocketMono, poster: renderPosterMono },
+  cover: { pocket: renderPocketCover, poster: renderPosterCover },
+  bold: { pocket: renderPocketBold, poster: renderPosterBold },
+  frame: { pocket: renderPocketFrame, poster: renderPosterFrame },
+  ticket: { pocket: renderPocketTicket, poster: renderPosterTicket },
+  spotlight: { pocket: renderPocketSpotlight, poster: renderPosterSpotlight },
+  bento: { pocket: renderPocketBento, poster: renderPosterBento },
+  classic: { pocket: renderPocketCard, poster: renderPoster },
+};
 
 const DESIGNS: { id: Design; name: string; size: string; tip: string }[] = [
   { id: "pocket", name: "Business card", size: "3.5 × 2 in", tip: "Print at 100% on card stock, or send to any business-card printer." },
@@ -33,7 +76,7 @@ const DESIGNS: { id: Design; name: string; size: string; tip: string }[] = [
 
 interface Options {
   design: Design;
-  layout: "bento" | "classic";
+  layout: Layout;
   bentoPhoto: boolean;
   style: CardStyle;
   photoInQr: boolean;
@@ -43,11 +86,12 @@ interface Options {
   accentBar: boolean;
   showIcons: boolean;
   showContact: boolean;
+  showLink: boolean;
 }
 
 const DEFAULTS: Options = {
   design: "pocket",
-  layout: "bento",
+  layout: "split",
   bentoPhoto: true,
   style: "light",
   photoInQr: false,
@@ -57,6 +101,7 @@ const DEFAULTS: Options = {
   accentBar: true,
   showIcons: true,
   showContact: true,
+  showLink: false,
 };
 
 function Segmented<T extends string>({
@@ -106,7 +151,8 @@ function Toggle({ label, hint, checked, onChange, disabled }: { label: string; h
 
 export default function QrStudioPage() {
   const { username, profile } = useAccount();
-  const storageKey = `hq:print:${username}`;
+  // v2: the default layout changed, so earlier saved choices start fresh.
+  const storageKey = `hq:print:v2:${username}`;
   const [opts, setOpts] = useState<Options>(() => {
     try {
       const saved = window.localStorage.getItem(storageKey);
@@ -119,6 +165,7 @@ export default function QrStudioPage() {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const thumbRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
   const set = <K extends keyof Options>(key: K, value: Options[K]) => setOpts((o) => ({ ...o, [key]: value }));
 
@@ -147,14 +194,15 @@ export default function QrStudioPage() {
     };
   }, [profile.photo]);
 
-  const bento = opts.layout === "bento";
-  const position: PhotoPosition = bento ? (opts.bentoPhoto ? "above" : "none") : opts.design === "poster" ? opts.posterPosition : opts.pocketPosition;
+  const classic = opts.layout === "classic";
+  const position: PhotoPosition = !classic ? (opts.bentoPhoto ? "above" : "none") : opts.design === "poster" ? opts.posterPosition : opts.pocketPosition;
   const card: PersonCard = {
     name: profile.displayName,
     headline: profile.headline,
     roles: profile.roles,
     url: qrUrl,
     displayUrl,
+    showLink: opts.showLink,
     accent: ACCENT_HEX[profile.accent],
     photo,
     initials: initials(profile.displayName),
@@ -172,13 +220,19 @@ export default function QrStudioPage() {
     if (!canvas || !ready) {
       return;
     }
-    if (opts.design === "pocket") {
-      (bento ? renderPocketBento : renderPocketCard)(canvas, card);
-    } else if (opts.design === "poster") {
-      (bento ? renderPosterBento : renderPoster)(canvas, card);
-    } else {
+    if (opts.design === "qr") {
       renderQrOnly(canvas, card);
+      return;
     }
+    const kind = opts.design;
+    RENDERERS[opts.layout][kind](canvas, card);
+    // Each thumbnail is the real design at full size, scaled down by CSS.
+    LAYOUTS.forEach((layout, i) => {
+      const thumb = thumbRefs.current[i];
+      if (thumb) {
+        RENDERERS[layout.id][kind](thumb, card);
+      }
+    });
   });
 
   async function downloadPng() {
@@ -237,16 +291,6 @@ export default function QrStudioPage() {
           {isCard && (
             <>
               <Segmented
-                label="Layout"
-                value={opts.layout}
-                options={[
-                  { id: "bento", text: "Bento" },
-                  { id: "classic", text: "Classic" },
-                ]}
-                onChange={(v) => set("layout", v)}
-              />
-
-              <Segmented
                 label="Style"
                 value={opts.style}
                 options={[
@@ -256,7 +300,7 @@ export default function QrStudioPage() {
                 onChange={(v) => set("style", v)}
               />
 
-              {bento ? (
+              {!classic ? (
                 <Segmented
                   label="Photo"
                   value={opts.bentoPhoto ? "show" : "hide"}
@@ -306,7 +350,7 @@ export default function QrStudioPage() {
                 <p className="label mb-0">Details</p>
                 <Toggle
                   label="Profile icons"
-                  hint={bento ? "Shown in a tile in your accent colour." : "LinkedIn, X, GitHub… so people know where to find you."}
+                  hint="LinkedIn, X, GitHub… so people know where to find you."
                   checked={opts.showIcons}
                   onChange={(v) => set("showIcons", v)}
                 />
@@ -317,7 +361,13 @@ export default function QrStudioPage() {
                   disabled={!contact}
                   onChange={(v) => set("showContact", v)}
                 />
-                {!bento && (
+                <Toggle
+                  label="Show my link"
+                  hint="Prints your HelloQR address instead of the HelloQR logo, for people who'd rather type it."
+                  checked={opts.showLink}
+                  onChange={(v) => set("showLink", v)}
+                />
+                {classic && (
                   <Toggle label="Accent colour bar" hint="Uses your card's accent colour." checked={opts.accentBar} onChange={(v) => set("accentBar", v)} />
                 )}
               </div>
@@ -344,14 +394,46 @@ export default function QrStudioPage() {
           </div>
         </div>
 
-        <div className="grid min-h-80 place-items-center self-start rounded-2xl border border-line bg-surface-2 p-4 sm:p-8 lg:sticky lg:top-32">
-          {!ready && <div className="skeleton aspect-[7/4] w-full max-w-xl" />}
-          <canvas
-            ref={canvasRef}
-            className={`h-auto max-h-[70dvh] w-auto max-w-full rounded-xl shadow-lg ring-1 ring-line ${ready ? "" : "hidden"}`}
-            aria-label={`${current.name} preview`}
-            role="img"
-          />
+        <div className="space-y-4 self-start lg:sticky lg:top-32">
+          {opts.design !== "qr" && (
+            <div>
+              <p className="label">Card design</p>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Card design">
+                {LAYOUTS.map((layout, i) => (
+                  <button
+                    key={layout.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={opts.layout === layout.id}
+                    onClick={() => set("layout", layout.id)}
+                    className={`group rounded-xl p-1.5 text-center transition ${
+                      opts.layout === layout.id ? "bg-surface shadow-[var(--tile-shadow)] ring-2 ring-ink" : "hover:bg-surface"
+                    }`}
+                  >
+                    <canvas
+                      ref={(el) => {
+                        thumbRefs.current[i] = el;
+                      }}
+                      className={`mx-auto h-auto w-full rounded-md ring-1 ring-line ${opts.design === "poster" ? "max-w-[4.5rem]" : ""}`}
+                      aria-hidden="true"
+                    />
+                    <span className={`mt-1.5 block text-xs font-semibold ${opts.layout === layout.id ? "text-ink" : "text-muted group-hover:text-ink"}`}>
+                      {layout.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="grid min-h-80 place-items-center rounded-2xl border border-line bg-surface-2 p-4 sm:p-8">
+            {!ready && <div className="skeleton aspect-[7/4] w-full max-w-xl" />}
+            <canvas
+              ref={canvasRef}
+              className={`h-auto max-h-[60dvh] w-auto max-w-full rounded-xl shadow-lg ring-1 ring-line ${ready ? "" : "hidden"}`}
+              aria-label={`${current.name} preview`}
+              role="img"
+            />
+          </div>
         </div>
       </div>
 

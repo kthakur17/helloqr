@@ -13,8 +13,10 @@ export interface PersonCard {
   roles: string[];
   /** What the QR encodes. */
   url: string;
-  /** Printed under the code, e.g. "helloqr.vercel.app/kunal". */
+  /** Printed only when showLink is on, e.g. "helloqr.vercel.app/kunal". */
   displayUrl: string;
+  /** Typed-in fallback for people who can't scan; off by default, the HelloQR logo shows instead. */
+  showLink: boolean;
   accent: string;
   photo: HTMLImageElement | null;
   initials: string;
@@ -327,6 +329,64 @@ function drawText(ctx: CanvasRenderingContext2D, block: TextBlock, x: number, to
   }
 }
 
+/** The HelloQR mark (see components/Logo.tsx), drawn in `ink` with its blocks cut out in `cut`. */
+function logoMark(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, ink: string, cut: string) {
+  const u = s / 28;
+  ctx.save();
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.roundRect(x, y, s, s, 7 * u);
+  ctx.fill();
+  ctx.fillStyle = cut;
+  for (const [bx, by, bs, br] of [
+    [7, 7, 5.5, 1.2],
+    [15.5, 7, 5.5, 1.2],
+    [7, 15.5, 5.5, 1.2],
+    [15.5, 15.5, 2.5, 0.6],
+    [18.5, 18.5, 2.5, 0.6],
+  ]) {
+    ctx.beginPath();
+    ctx.roundRect(x + bx * u, y + by * u, bs * u, bs * u, br * u);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * The card's sign-off line: the HelloQR logo, or the typed link when the owner asked for it.
+ * `baseline` is the text baseline either way, so layouts don't care which one is drawn.
+ */
+function brandLine(
+  ctx: CanvasRenderingContext2D,
+  card: Pick<PersonCard, "showLink" | "displayUrl">,
+  x: number,
+  baseline: number,
+  size: number,
+  align: CanvasTextAlign,
+  maxW: number,
+  colors: { ink: string; muted: string; cut: string },
+) {
+  ctx.textBaseline = "alphabetic";
+  if (card.showLink) {
+    ctx.textAlign = align;
+    ctx.fillStyle = colors.muted;
+    ctx.fillText(fitOrClip(ctx, card.displayUrl, sans(), 500, size, size * 0.75, maxW).text, x, baseline);
+    return;
+  }
+  const mark = size * 1.2;
+  const gap = size * 0.4;
+  ctx.font = `800 ${size * 1.05}px ${display()}`;
+  setSpacing(ctx, -size * 0.02);
+  const textW = ctx.measureText("HelloQR").width;
+  const total = mark + gap + textW;
+  const left = align === "center" ? x - total / 2 : align === "right" || align === "end" ? x - total : x;
+  logoMark(ctx, left, baseline - mark * 0.86, mark, colors.ink, colors.cut);
+  ctx.textAlign = "left";
+  ctx.fillStyle = colors.ink;
+  ctx.fillText("HelloQR", left + mark + gap, baseline);
+  setSpacing(ctx, 0);
+}
+
 // ---------- layouts ----------
 
 /** 3.5 × 2 in business card at 300 dpi. */
@@ -378,9 +438,7 @@ export function renderPocketCard(canvas: HTMLCanvasElement, card: PersonCard) {
   let bottomTop = bottom - 22;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = p.muted;
-  const address = fitOrClip(ctx, card.displayUrl, mono(), 400, 25, 18, colW).text;
-  ctx.fillText(address, left, bottom);
+  brandLine(ctx, card, left, bottom, 23, "left", colW, { ink: p.ink, muted: p.muted, cut: card.style === "dark" ? "#0a0a0a" : "#ffffff" });
   if (card.contact) {
     ctx.fillStyle = p.text;
     const contact = fitOrClip(ctx, card.contact, sans(), 400, 26, 20, colW).text;
@@ -462,10 +520,7 @@ export function renderPoster(canvas: HTMLCanvasElement, card: PersonCard) {
   qrBlock(ctx, card, card.style, (W - side) / 2, qy, side);
   label(ctx, "Scan to connect", W / 2, qy + side + 70, 24, p.faint, "center");
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = p.muted;
-  const address = fitOrClip(ctx, card.displayUrl, mono(), 400, 30, 18, W - 200).text;
-  ctx.fillText(address, W / 2, H - 80);
+  brandLine(ctx, card, W / 2, H - 80, 32, "center", W - 200, { ink: p.ink, muted: p.muted, cut: card.style === "dark" ? "#0a0a0a" : "#ffffff" });
 }
 
 // ---------- bento layouts ----------
@@ -544,9 +599,7 @@ function contactTile(ctx: CanvasRenderingContext2D, card: PersonCard, x: number,
   } else {
     label(ctx, "Find me online", x + pad, ty, sizes.url * 0.72, p.faint, "left");
   }
-  ctx.fillStyle = p.muted;
-  const url = fitOrClip(ctx, card.displayUrl, sans(), 500, sizes.url, sizes.url * 0.75, maxW).text;
-  ctx.fillText(url, x + pad, y + h - pad);
+  brandLine(ctx, card, x + pad, y + h - pad, sizes.url, "left", maxW, { ink: p.ink, muted: p.muted, cut: p.tile });
 }
 
 function qrTile(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, y: number, w: number, h: number, radius: number, side: number, labelSize: number) {
@@ -641,6 +694,738 @@ export function renderPosterBento(canvas: HTMLCanvasElement, card: PersonCard) {
   const accentW = 420;
   accentTile(ctx, card, M, bottomY, accentW, bottomH, R, 64);
   contactTile(ctx, card, M + accentW + G, bottomY, fullW - accentW - G, bottomH, R, { line: 36, url: 31 });
+}
+
+// ---------- split & aurora layouts ----------
+
+type Tone = { bg: string; ink: string; text: string; muted: string; faint: string };
+
+function tone(style: CardStyle): Tone {
+  return style === "dark"
+    ? { bg: "#101018", ink: "#f4f4f7", text: "#c9c9d6", muted: "#9a9aad", faint: "#6f6f84" }
+    : { bg: "#ffffff", ink: "#1a1a2e", text: "#3d3d56", muted: "#6b6b80", faint: "#9898a8" };
+}
+
+/** Profile icons as plain glyphs (no chips), so the row reads as a line of text, not boxes. */
+function glyphRow(ctx: CanvasRenderingContext2D, types: LinkType[], x: number, y: number, size: number, gap: number, maxWidth: number, t: Tone, align: "left" | "center") {
+  // icon() draws its glyph at 56% of the chip; a transparent chip leaves just the glyph.
+  const plain = { ...palette("light"), tile: "rgba(0,0,0,0)", ink: t.ink, cutout: t.bg };
+  iconRow(ctx, types, x, y, size, gap, maxWidth, plain, align);
+}
+
+/** Contact line and address, bottom-up from `bottom`. Returns the y above the block. */
+function footerLines(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, bottom: number, maxW: number, t: Tone, size: number, align: CanvasTextAlign) {
+  ctx.textAlign = align;
+  ctx.textBaseline = "alphabetic";
+  brandLine(ctx, card, x, bottom, size, align, maxW, { ink: t.ink, muted: t.muted, cut: t.bg });
+  ctx.textAlign = align;
+  let top = bottom - size * 1.35;
+  if (card.contact) {
+    ctx.fillStyle = t.text;
+    ctx.fillText(fitOrClip(ctx, card.contact, sans(), 500, size * 1.05, size * 0.8, maxW).text, x, bottom - size * 1.8);
+    top -= size * 1.8;
+  }
+  return top;
+}
+
+function whiteQrCard(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, y: number, side: number, pad: number, shadow: boolean) {
+  ctx.save();
+  if (shadow) {
+    ctx.shadowColor = "rgba(16,16,40,0.18)";
+    ctx.shadowBlur = side * 0.12;
+    ctx.shadowOffsetY = side * 0.03;
+  }
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(x, y, side + pad * 2, side + pad * 2, (side + pad * 2) * 0.09);
+  ctx.fill();
+  ctx.restore();
+  drawQr(ctx, card.url, x + pad, y + pad, side, {
+    quiet: 1,
+    center: card.photoInQr ? { image: card.photo, initials: card.initials, color: card.accent } : null,
+  });
+}
+
+function hexAlpha(hex: string, alpha: number) {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+function auroraBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number, card: PersonCard) {
+  const dark = card.style === "dark";
+  ctx.fillStyle = dark ? "#0e0e18" : "#f8f7f4";
+  ctx.fillRect(0, 0, w, h);
+  const glow = (cx: number, cy: number, r: number, color: string, alpha: number) => {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, hexAlpha(color, alpha));
+    g.addColorStop(1, hexAlpha(color, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  };
+  const m = Math.max(w, h);
+  glow(w * 0.95, -h * 0.1, m * 0.75, card.accent, dark ? 0.55 : 0.32);
+  glow(w * 1.05, h * 1.1, m * 0.6, "#a78bfa", dark ? 0.35 : 0.2);
+  glow(w * 0.1, h * 1.05, m * 0.45, "#38bdf8", dark ? 0.22 : 0.1);
+}
+
+function ringedAvatar(ctx: CanvasRenderingContext2D, card: PersonCard, cx: number, cy: number, r: number, ring: string) {
+  ctx.fillStyle = ring;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + r * 0.09, 0, Math.PI * 2);
+  ctx.fill();
+  avatar(ctx, card, cx, cy, r);
+}
+
+const SPLIT_RADIUS: Record<PhotoSize, number> = { s: 42, m: 54, l: 66 };
+const SPLIT_POSTER_RADIUS: Record<PhotoSize, number> = { s: 90, m: 115, l: 140 };
+
+/** Business card in two zones: details on the left, one accent panel holding the code on the right. */
+export function renderPocketSplit(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const panelX = 650;
+  ctx.fillStyle = card.accent;
+  ctx.fillRect(panelX, 0, W - panelX, H);
+  const sheen = ctx.createRadialGradient(W, 0, 0, W, 0, 420);
+  sheen.addColorStop(0, "rgba(255,255,255,0.22)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(panelX, 0, W - panelX, H);
+
+  const side = 250;
+  const pad = 20;
+  const qx = panelX + (W - panelX - side - pad * 2) / 2;
+  const qy = (H - side - pad * 2) / 2 - 26;
+  whiteQrCard(ctx, card, qx, qy, side, pad, false);
+  label(ctx, "Scan to connect", panelX + (W - panelX) / 2, qy + side + pad * 2 + 44, 15, "rgba(255,255,255,0.85)", "center");
+
+  const left = 64;
+  const colW = panelX - left - 52;
+  const iconTopLimit = footerLines(ctx, card, left, H - 56, colW, t, 21, "left");
+  let bottomOfText = iconTopLimit - 14;
+  if (card.linkTypes.length) {
+    const size = 46;
+    glyphRow(ctx, card.linkTypes, left - 8, iconTopLimit - size - 6, size, 2, colW, t, "left");
+    bottomOfText = iconTopLimit - size - 22;
+  }
+
+  let top = 58;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_RADIUS[card.photoSize];
+    avatar(ctx, card, left + r, top + r, r);
+    top += r * 2 + 24;
+  }
+  const block = layoutText(ctx, card, colW, bottomOfText - top, { name: 46, nameMin: 26, headline: 24, roles: 20 });
+  const textTop = card.photoPosition === "none" ? top + Math.max(0, (bottomOfText - top - block.height) / 2) : top;
+  drawText(ctx, block, left, textTop, t as ReturnType<typeof palette>, "left");
+}
+
+/** Business card on one soft gradient with the code on a floating white card. */
+export function renderPocketAurora(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = { ...tone(card.style), bg: card.style === "dark" ? "#0e0e18" : "#f8f7f4" };
+  auroraBackdrop(ctx, W, H, card);
+
+  const side = 256;
+  const pad = 22;
+  const qx = W - side - pad * 2 - 64;
+  const qy = (H - side - pad * 2) / 2 - 24;
+  whiteQrCard(ctx, card, qx, qy, side, pad, true);
+  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 42, 15, t.muted, "center");
+
+  const left = 68;
+  const colW = qx - left - 56;
+  const iconTopLimit = footerLines(ctx, card, left, H - 56, colW, t, 21, "left");
+  let bottomOfText = iconTopLimit - 14;
+  if (card.linkTypes.length) {
+    const size = 46;
+    glyphRow(ctx, card.linkTypes, left - 8, iconTopLimit - size - 6, size, 2, colW, { ...t, bg: card.style === "dark" ? "#141424" : "#f3f1f5" }, "left");
+    bottomOfText = iconTopLimit - size - 22;
+  }
+
+  let top = 60;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_RADIUS[card.photoSize];
+    ringedAvatar(ctx, card, left + r, top + r, r, card.style === "dark" ? "rgba(255,255,255,0.14)" : "#ffffff");
+    top += r * 2 + 28;
+  }
+  const block = layoutText(ctx, card, colW, bottomOfText - top, { name: 46, nameMin: 26, headline: 24, roles: 20 });
+  const textTop = card.photoPosition === "none" ? top + Math.max(0, (bottomOfText - top - block.height) / 2) : top;
+  drawText(ctx, block, left, textTop, t as ReturnType<typeof palette>, "left");
+}
+
+/** Desk card: details on top, the code on a full-width accent band below. */
+export function renderPosterSplit(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const bandY = 960;
+  ctx.fillStyle = card.accent;
+  ctx.fillRect(0, bandY, W, H - bandY);
+  const sheen = ctx.createRadialGradient(W, bandY, 0, W, bandY, 900);
+  sheen.addColorStop(0, "rgba(255,255,255,0.2)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, bandY, W, H - bandY);
+
+  const side = 520;
+  const pad = 34;
+  const qy = bandY + 70;
+  whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, false);
+  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 70, 26, "rgba(255,255,255,0.88)", "center");
+
+  let top = 110;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize];
+    avatar(ctx, card, W / 2, top + r, r);
+    top += r * 2 + 44;
+  }
+  const iconsH = card.linkTypes.length ? 80 : 0;
+  const footerH = card.contact ? 110 : 60;
+  const space = bandY - 70 - footerH - iconsH - top;
+  const block = layoutText(ctx, card, W - 200, space, { name: 80, nameMin: 42, headline: 38, roles: 30 });
+  drawText(ctx, block, W / 2, top, t as ReturnType<typeof palette>, "center");
+  const y = top + block.height + 34;
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, W / 2, y, 72, 4, W - 200, t, "center");
+  }
+  footerLines(ctx, card, W / 2, bandY - 64, W - 200, t, 32, "center");
+}
+
+/** Desk card on one soft gradient with a large floating code. */
+export function renderPosterAurora(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = { ...tone(card.style), bg: card.style === "dark" ? "#0e0e18" : "#f8f7f4" };
+  auroraBackdrop(ctx, W, H, card);
+
+  let top = 120;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize];
+    ringedAvatar(ctx, card, W / 2, top + r, r, card.style === "dark" ? "rgba(255,255,255,0.14)" : "#ffffff");
+    top += r * 2 + 50;
+  }
+  const block = layoutText(ctx, card, W - 200, 300, { name: 80, nameMin: 42, headline: 38, roles: 30 });
+  drawText(ctx, block, W / 2, top, t as ReturnType<typeof palette>, "center");
+  let y = top + block.height + 40;
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, W / 2, y, 72, 4, W - 200, { ...t, bg: card.style === "dark" ? "#141424" : "#f3f1f5" }, "center");
+    y += 72 + 30;
+  }
+
+  const footerTop = H - 90 - (card.contact ? 52 : 0);
+  const pad = 36;
+  const side = Math.max(380, Math.min(540, footerTop - 120 - y - pad * 2));
+  const qy = y + Math.max(20, (footerTop - 110 - y - side - pad * 2) / 2);
+  whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
+  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 60, 24, t.muted, "center");
+  footerLines(ctx, card, W / 2, H - 90, W - 200, t, 30, "center");
+}
+
+// ---------- mono layout ----------
+
+/** Code with a hairline outline instead of a panel; dark cards keep a white tile for contrast. */
+function outlinedQr(ctx: CanvasRenderingContext2D, card: PersonCard, x: number, y: number, side: number, pad: number) {
+  const box = side + pad * 2;
+  ctx.save();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.roundRect(x, y, box, box, box * 0.06);
+  ctx.fill();
+  if (card.style === "light") {
+    ctx.strokeStyle = "#e3e1dc";
+    ctx.lineWidth = Math.max(2, box * 0.006);
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawQr(ctx, card.url, x + pad, y + pad, side, {
+    quiet: 1,
+    center: card.photoInQr ? { image: card.photo, initials: card.initials, color: card.accent } : null,
+  });
+}
+
+/** Typographic business card: big name, one accent rule, a hairline divider, nothing boxed. */
+export function renderPocketMono(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = card.accent;
+  ctx.fillRect(0, 0, W, 12);
+
+  const side = 236;
+  const pad = 18;
+  const qx = W - side - pad * 2 - 64;
+  const qy = (H - side - pad * 2) / 2 - 22;
+  outlinedQr(ctx, card, qx, qy, side, pad);
+  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, "center");
+
+  const divider = qx - 48;
+  ctx.fillStyle = card.style === "dark" ? "#2d2d3d" : "#e8e6e3";
+  ctx.fillRect(divider, 64, 2, H - 128);
+
+  const left = 68;
+  const colW = divider - left - 44;
+  const iconTop = footerLines(ctx, card, left, H - 60, colW, t, 20, "left");
+  let bottomOfText = iconTop - 16;
+  if (card.linkTypes.length) {
+    const size = 44;
+    glyphRow(ctx, card.linkTypes, left - 8, iconTop - size - 6, size, 2, colW, t, "left");
+    bottomOfText = iconTop - size - 22;
+  }
+
+  let top = 62;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_RADIUS[card.photoSize] * 0.78;
+    avatar(ctx, card, left + r, top + r, r);
+    top += r * 2 + 22;
+  }
+  const block = layoutText(ctx, card, colW, bottomOfText - top, { name: 50, nameMin: 26, headline: 23, roles: 19 });
+  drawText(ctx, block, left, top, t as ReturnType<typeof palette>, "left");
+}
+
+/** Typographic desk card. */
+export function renderPosterMono(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = card.accent;
+  ctx.fillRect(0, 0, W, 20);
+
+  const left = 110;
+  const colW = W - left * 2;
+  let top = 130;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize] * 0.72;
+    avatar(ctx, card, left + r, top + r, r);
+    top += r * 2 + 48;
+  }
+  const block = layoutText(ctx, card, colW, 340, { name: 92, nameMin: 44, headline: 38, roles: 30 });
+  drawText(ctx, block, left, top, t as ReturnType<typeof palette>, "left");
+  let y = top + block.height + 56;
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, left - 16, y, 76, 4, colW, t, "left");
+    y += 76 + 40;
+  }
+
+  const footerTop = H - 100 - (card.contact ? 52 : 0);
+  const pad = 30;
+  const side = Math.max(360, Math.min(520, footerTop - 110 - y - pad * 2));
+  const qy = y + Math.max(10, (footerTop - 100 - y - side - pad * 2) / 2);
+  outlinedQr(ctx, card, left, qy, side, pad);
+  label(ctx, "Scan to connect", left, qy + side + pad * 2 + 56, 24, t.faint, "left");
+  footerLines(ctx, card, left, H - 100, colW, t, 30, "left");
+}
+
+// ---------- cover, bold, frame, ticket, spotlight ----------
+
+/** Text on a coloured surface: white ink, with the logo's blocks cut out in the surface colour. */
+function onColor(surface: string): Tone {
+  return { bg: surface, ink: "#ffffff", text: "rgba(255,255,255,0.88)", muted: "rgba(255,255,255,0.72)", faint: "rgba(255,255,255,0.6)" };
+}
+
+/** Mixes a colour toward `other`; used to deepen the accent for gradients. */
+function mix(hex: string, other: string, amount: number) {
+  const a = parseInt(hex.replace("#", ""), 16);
+  const b = parseInt(other.replace("#", ""), 16);
+  const ch = (shift: number) => Math.round(((a >> shift) & 255) * (1 - amount) + ((b >> shift) & 255) * amount);
+  return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Icons row and footer (contact + logo), stacked up from `bottom`. Returns the y above the stack. */
+function footerStack(ctx: CanvasRenderingContext2D, card: PersonCard, t: Tone, x: number, bottom: number, w: number, align: "left" | "center", iconSize: number, footSize: number) {
+  const top = footerLines(ctx, card, x, bottom, w, t, footSize, align);
+  if (!card.linkTypes.length) {
+    return top - footSize * 0.6;
+  }
+  glyphRow(ctx, card.linkTypes, align === "left" ? x - iconSize * 0.18 : x, top - iconSize - footSize * 0.3, iconSize, 2, w, t, align);
+  return top - iconSize - footSize * 0.9;
+}
+
+function textBlock(ctx: CanvasRenderingContext2D, card: PersonCard, t: Tone, x: number, top: number, w: number, maxH: number, big: boolean, align: CanvasTextAlign) {
+  const sizes = big ? { name: 80, nameMin: 42, headline: 38, roles: 30 } : { name: 46, nameMin: 26, headline: 23, roles: 19 };
+  const block = layoutText(ctx, card, w, maxH, sizes);
+  drawText(ctx, block, x, top, t as ReturnType<typeof palette>, align);
+  return block.height;
+}
+
+function sheen(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, cx: number, cy: number, r: number, alpha = 0.2) {
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+}
+
+const COVER_RADIUS: Record<PhotoSize, number> = { s: 56, m: 66, l: 76 };
+
+/** Profile-style card: an accent header band, photo overlapping its edge, QR card straddling it. */
+export function renderPocketCover(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  const band = 200;
+  ctx.fillStyle = card.accent;
+  ctx.fillRect(0, 0, W, band);
+  sheen(ctx, 0, 0, W, band, W * 0.7, -40, 520);
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, 62, 46, 46, 2, 520, onColor(card.accent), "left");
+  }
+
+  const side = 232;
+  const pad = 18;
+  const qx = W - side - pad * 2 - 64;
+  const qy = 104;
+  whiteQrCard(ctx, card, qx, qy, side, pad, true);
+  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, "center");
+
+  const left = 70;
+  const colW = qx - left - 48;
+  const footTop = footerLines(ctx, card, left, H - 54, colW, t, 20, "left");
+  let top = band + 34;
+  if (card.photoPosition !== "none") {
+    const r = COVER_RADIUS[card.photoSize];
+    ringedAvatar(ctx, card, left + r, band, r, t.bg);
+    top = band + r + 26;
+  }
+  textBlock(ctx, card, t, left, top, colW, footTop - 14 - top, false, "left");
+}
+
+export function renderPosterCover(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  const band = 440;
+  ctx.fillStyle = card.accent;
+  ctx.fillRect(0, 0, W, band);
+  sheen(ctx, 0, 0, W, band, W * 0.75, -80, 900);
+  let top = band + 70;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize];
+    ringedAvatar(ctx, card, W / 2, band, r, t.bg);
+    top = band + r + 50;
+  }
+  const h = textBlock(ctx, card, t, W / 2, top, W - 200, 300, true, "center");
+  let y = top + h + 34;
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, W / 2, y, 72, 4, W - 200, t, "center");
+    y += 72 + 24;
+  }
+  const footTop = footerLines(ctx, card, W / 2, H - 80, W - 200, t, 30, "center");
+  const pad = 30;
+  const side = Math.max(340, Math.min(500, footTop - 90 - y - pad * 2));
+  const qy = y + Math.max(10, (footTop - 80 - y - side - pad * 2) / 2);
+  whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
+  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 46, 22, t.faint, "center");
+}
+
+/** The whole card in the accent colour, deepened with a gradient; white type, white QR card. */
+function boldBackdrop(ctx: CanvasRenderingContext2D, w: number, h: number, card: PersonCard) {
+  const deep = mix(card.accent, card.style === "dark" ? "#05050c" : "#141428", card.style === "dark" ? 0.6 : 0.45);
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, card.accent);
+  g.addColorStop(1, deep);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  sheen(ctx, 0, 0, w, h, w * 0.15, -h * 0.2, Math.max(w, h) * 0.7, 0.18);
+  return deep;
+}
+
+export function renderPocketBold(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const deep = boldBackdrop(ctx, W, H, card);
+  const t = onColor(mix(card.accent, deep, 0.6));
+
+  const side = 250;
+  const pad = 20;
+  const qx = W - side - pad * 2 - 64;
+  const qy = (H - side - pad * 2) / 2 - 24;
+  whiteQrCard(ctx, card, qx, qy, side, pad, true);
+  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 42, 15, t.muted, "center");
+
+  const left = 68;
+  const colW = qx - left - 52;
+  const bottomOfText = footerStack(ctx, card, t, left, H - 56, colW, "left", 46, 21);
+  let top = 58;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_RADIUS[card.photoSize];
+    ringedAvatar(ctx, card, left + r, top + r, r, "rgba(255,255,255,0.35)");
+    top += r * 2 + 26;
+  }
+  textBlock(ctx, card, t, left, top, colW, bottomOfText - top, false, "left");
+}
+
+export function renderPosterBold(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const deep = boldBackdrop(ctx, W, H, card);
+  const t = onColor(mix(card.accent, deep, 0.6));
+  let top = 120;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize];
+    ringedAvatar(ctx, card, W / 2, top + r, r, "rgba(255,255,255,0.35)");
+    top += r * 2 + 50;
+  }
+  const h = textBlock(ctx, card, t, W / 2, top, W - 200, 300, true, "center");
+  let y = top + h + 40;
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, W / 2, y, 72, 4, W - 200, t, "center");
+    y += 72 + 30;
+  }
+  const footTop = footerLines(ctx, card, W / 2, H - 90, W - 200, t, 30, "center");
+  const pad = 34;
+  const side = Math.max(360, Math.min(520, footTop - 100 - y - pad * 2));
+  const qy = y + Math.max(10, (footTop - 90 - y - side - pad * 2) / 2);
+  whiteQrCard(ctx, card, (W - side - pad * 2) / 2, qy, side, pad, true);
+  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 54, 24, t.muted, "center");
+}
+
+/** A clean card inside a fine accent border. */
+function frame(ctx: CanvasRenderingContext2D, w: number, h: number, card: PersonCard, inset: number, line: number) {
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = card.accent;
+  ctx.lineWidth = line;
+  ctx.beginPath();
+  ctx.roundRect(inset, inset, w - inset * 2, h - inset * 2, inset * 0.9);
+  ctx.stroke();
+  return t;
+}
+
+export function renderPocketFrame(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = frame(ctx, W, H, card, 26, 4);
+
+  const side = 232;
+  const pad = 16;
+  const qx = W - side - pad * 2 - 76;
+  const qy = (H - side - pad * 2) / 2 - 22;
+  outlinedQr(ctx, card, qx, qy, side, pad);
+  label(ctx, "Scan to connect", qx + side / 2 + pad, qy + side + pad * 2 + 40, 14, t.faint, "center");
+
+  const left = 82;
+  const colW = qx - left - 50;
+  const bottomOfText = footerStack(ctx, card, t, left, H - 72, colW, "left", 44, 20);
+  let top = 72;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_RADIUS[card.photoSize] * 0.85;
+    avatar(ctx, card, left + r, top + r, r);
+    top += r * 2 + 22;
+  }
+  textBlock(ctx, card, t, left, top, colW, bottomOfText - top, false, "left");
+}
+
+export function renderPosterFrame(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = frame(ctx, W, H, card, 44, 7);
+  let top = 150;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize] * 0.9;
+    avatar(ctx, card, W / 2, top + r, r);
+    top += r * 2 + 46;
+  }
+  const h = textBlock(ctx, card, t, W / 2, top, W - 260, 300, true, "center");
+  let y = top + h + 36;
+  if (card.linkTypes.length) {
+    glyphRow(ctx, card.linkTypes, W / 2, y, 72, 4, W - 260, t, "center");
+    y += 72 + 26;
+  }
+  const footTop = footerLines(ctx, card, W / 2, H - 120, W - 260, t, 30, "center");
+  const pad = 26;
+  const side = Math.max(340, Math.min(500, footTop - 100 - y - pad * 2));
+  const qy = y + Math.max(10, (footTop - 90 - y - side - pad * 2) / 2);
+  outlinedQr(ctx, card, (W - side - pad * 2) / 2, qy, side, pad);
+  label(ctx, "Scan to connect", W / 2, qy + side + pad * 2 + 50, 22, t.faint, "center");
+}
+
+/** Perforation between the main part and the stub, with a notch at each end. */
+function perforation(ctx: CanvasRenderingContext2D, card: PersonCard, x1: number, y1: number, x2: number, y2: number, notch: number) {
+  const hole = card.style === "dark" ? "#05050b" : "#e9e7e2";
+  ctx.save();
+  ctx.strokeStyle = card.style === "dark" ? "#3a3a4d" : "#cfccc5";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 10]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = hole;
+  for (const [cx, cy] of [
+    [x1, y1],
+    [x2, y2],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, notch, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+export function renderPocketTicket(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  const stubX = 700;
+  ctx.fillStyle = hexAlpha(card.accent, card.style === "dark" ? 0.22 : 0.1);
+  ctx.fillRect(stubX, 0, W - stubX, H);
+  perforation(ctx, card, stubX, 0, stubX, H, 26);
+
+  const side = 236;
+  const pad = 16;
+  const qx = stubX + (W - stubX - side - pad * 2) / 2;
+  const qy = (H - side - pad * 2) / 2 - 24;
+  whiteQrCard(ctx, card, qx, qy, side, pad, false);
+  label(ctx, "Scan to connect", stubX + (W - stubX) / 2, qy + side + pad * 2 + 40, 14, card.accent, "center");
+
+  const left = 70;
+  const colW = stubX - left - 56;
+  label(ctx, "Hello, I'm", left, 84, 16, card.accent, "left");
+  const bottomOfText = footerStack(ctx, card, t, left, H - 56, colW, "left", 44, 20);
+  let top = 108;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_RADIUS[card.photoSize] * 0.8;
+    avatar(ctx, card, left + r, top + r, r);
+    top += r * 2 + 20;
+  }
+  textBlock(ctx, card, t, left, top, colW, bottomOfText - top, false, "left");
+}
+
+export function renderPosterTicket(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  const stubY = 1060;
+  ctx.fillStyle = hexAlpha(card.accent, card.style === "dark" ? 0.22 : 0.1);
+  ctx.fillRect(0, stubY, W, H - stubY);
+  perforation(ctx, card, 0, stubY, W, stubY, 44);
+
+  label(ctx, "Hello, I'm", W / 2, 150, 28, card.accent, "center");
+  let top = 200;
+  if (card.photoPosition !== "none") {
+    const r = SPLIT_POSTER_RADIUS[card.photoSize] * 0.9;
+    avatar(ctx, card, W / 2, top + r, r);
+    top += r * 2 + 44;
+  }
+  // Everything about the person sits above the perforation; the stub holds only the code.
+  const bottomOfText = footerStack(ctx, card, t, W / 2, stubY - 70, W - 200, "center", 72, 28);
+  textBlock(ctx, card, t, W / 2, top, W - 200, bottomOfText - top - 10, true, "center");
+
+  const pad = 30;
+  const side = 440;
+  const box = side + pad * 2;
+  const qy = stubY + (H - stubY - box - 70) / 2;
+  whiteQrCard(ctx, card, (W - box) / 2, qy, side, pad, false);
+  label(ctx, "Scan to connect", W / 2, qy + box + 50, 24, card.accent, "center");
+}
+
+/** Photo-forward: a full-height portrait down the left, details and a compact code beside it. */
+export function renderPocketSpotlight(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POCKET;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  const panelW = card.photoPosition === "none" ? 0 : { s: 300, m: 340, l: 380 }[card.photoSize];
+  if (panelW) {
+    photoRect(ctx, card, 0, 0, panelW, H);
+    ctx.fillStyle = card.accent;
+    ctx.fillRect(panelW, 0, 8, H);
+  }
+
+  const left = panelW + 56;
+  const right = W - 56;
+  const side = 168;
+  const pad = 12;
+  const box = side + pad * 2;
+  const qx = right - box;
+  const qy = H - 56 - box;
+  outlinedQr(ctx, card, qx, qy, side, pad);
+
+  const footW = qx - left - 30;
+  const bottomOfFoot = footerStack(ctx, card, t, left, H - 56, footW, "left", 42, 19);
+  textBlock(ctx, card, t, left, 64, right - left, Math.min(qy, bottomOfFoot) - 64 - 20, false, "left");
+}
+
+export function renderPosterSpotlight(canvas: HTMLCanvasElement, card: PersonCard) {
+  const { width: W, height: H } = POSTER;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const t = tone(card.style);
+  ctx.fillStyle = t.bg;
+  ctx.fillRect(0, 0, W, H);
+  const photoH = card.photoPosition === "none" ? 0 : { s: 640, m: 720, l: 800 }[card.photoSize];
+  if (photoH) {
+    photoRect(ctx, card, 0, 0, W, photoH);
+    ctx.fillStyle = card.accent;
+    ctx.fillRect(0, photoH, W, 14);
+  } else {
+    ctx.fillStyle = card.accent;
+    ctx.fillRect(0, 0, W, 20);
+  }
+  const left = 100;
+  const top = photoH + 80;
+  const pad = 22;
+  const side = 300;
+  const box = side + pad * 2;
+  const qy = H - 90 - box;
+  outlinedQr(ctx, card, W - 100 - box, qy, side, pad);
+  const footW = W - 100 - box - left - 40;
+  const bottomOfFoot = footerStack(ctx, card, t, left, H - 90, footW, "left", 64, 28);
+  textBlock(ctx, card, t, left, top, W - 200, Math.min(qy, bottomOfFoot) - top - 30, true, "left");
 }
 
 export function renderEventPoster(canvas: HTMLCanvasElement, event: EventCard) {
