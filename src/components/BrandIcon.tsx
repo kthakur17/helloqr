@@ -52,12 +52,65 @@ export function BrandIcon({ type, className = "size-5" }: { type: LinkType; clas
   );
 }
 
-/** Monochrome icon tile: the brand is recognisable by shape, the card stays calm. */
-export function BrandChip({ type, size = "md" }: { type: LinkType; size?: "sm" | "md" }) {
-  const box = size === "sm" ? "size-8 rounded-lg" : "size-10 rounded-[0.7rem]";
+const OWN_COLORS: Partial<Record<LinkType, string>> = {
+  linkedin: "#0a66c2",
+  email: "#1a1a2e",
+  website: "#1a1a2e",
+  custom: "#1a1a2e",
+};
+
+/** The brand's own colour; near-black brands are lifted to Bento's ink so they sit with the palette. */
+export function brandColor(type: LinkType): string {
+  const hex = (OWN_COLORS[type] ?? brandPaths[type]?.hex ?? "#1a1a2e").toLowerCase();
+  return hex === "#000000" || hex === "#181717" || hex === "#101010" ? "#1a1a2e" : hex;
+}
+
+export function isInkBrand(type: LinkType): boolean {
+  return brandColor(type) === "#1a1a2e";
+}
+
+/** Background for a large brand-coloured tile; ink brands use slate so the tile stands out in both themes. */
+export function brandTileColor(type: LinkType): string {
+  return isInkBrand(type) ? "#374151" : brandColor(type);
+}
+
+/**
+ * Icon tile. "brand" uses the network's colour (link tiles), "mono" a neutral chip (lists),
+ * "inverse" a translucent white chip for use on a brand-coloured tile.
+ */
+export function BrandChip({ type, size = "md", tone = "mono" }: { type: LinkType; size?: "sm" | "md"; tone?: "mono" | "brand" | "inverse" }) {
+  const box = size === "sm" ? "size-8 rounded-lg" : "size-10 rounded-xl";
   const icon = size === "sm" ? "size-4" : "size-5";
+  if (type === "linkedin" && tone !== "mono") {
+    return (
+      <span
+        className={`grid shrink-0 place-items-center font-[Arial,Helvetica,sans-serif] font-bold text-white ${box} ${size === "sm" ? "text-sm" : "text-base"}`}
+        style={{ background: tone === "brand" ? brandColor(type) : "rgb(255 255 255 / 0.18)" }}
+      >
+        in
+      </span>
+    );
+  }
+  // Black-branded networks (X, GitHub, website…) follow the theme so they never vanish on a dark tile.
+  if (tone === "brand" && isInkBrand(type)) {
+    return (
+      <span className={`grid shrink-0 place-items-center bg-ink text-bg ${box}`}>
+        <BrandIcon type={type} className={icon} />
+      </span>
+    );
+  }
+  if (tone === "mono") {
+    return (
+      <span className={`grid shrink-0 place-items-center bg-surface-2 text-ink ${box}`}>
+        <BrandIcon type={type} className={icon} />
+      </span>
+    );
+  }
   return (
-    <span className={`grid shrink-0 place-items-center bg-surface-2 text-ink ${box}`}>
+    <span
+      className={`grid shrink-0 place-items-center text-white ${box}`}
+      style={{ background: tone === "brand" ? brandColor(type) : "rgb(255 255 255 / 0.18)" }}
+    >
       <BrandIcon type={type} className={icon} />
     </span>
   );

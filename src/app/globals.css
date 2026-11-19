@@ -1,52 +1,58 @@
 @import "tailwindcss";
 
-/* Neutral, near-monochrome palette. The only colour on a card is its owner's accent. */
+/*
+ * Bento Grid design language, adapted from the "Bento Grid" guide in
+ * github.com/chrislemke/website_designs (MIT). Warm canvas, white rounded tiles,
+ * uniform gaps, soft depth instead of borders. Dark mode is our own extension.
+ */
 :root {
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --line: #e4e4e7;
-  --line-soft: #ededef;
-  --ink: #09090b;
-  --text: #3f3f46;
-  --muted: #71717a;
-  --faint: #a1a1aa;
-  --accent: #18181b;
-  --accent-hover: #27272a;
-  --accent-soft: #f4f4f5;
+  --bg: #f8f7f4; /* Snow: page canvas */
+  --surface: #ffffff; /* Rice: tiles */
+  --surface-2: #f0eeeb; /* Sesame: secondary tiles, chips */
+  --line: #e8e6e3; /* Tofu: borders, dividers */
+  --line-soft: #efede9;
+  --ink: #1a1a2e; /* Nori: headings, primary text */
+  --text: #3d3d56; /* Soy: body */
+  --muted: #6b6b80; /* Ginger: captions, labels */
+  --faint: #9898a8;
+  --accent: #1a1a2e;
+  --accent-hover: #2b2b45;
+  --accent-soft: #f0eeeb;
   --accent-ink: #ffffff;
-  --success: #15803d;
-  --success-soft: #f0fdf4;
-  --warn: #b45309;
-  --warn-soft: #fffbeb;
-  --danger: #dc2626;
-  --danger-soft: #fef2f2;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.04);
+  --success: #237a55;
+  --success-soft: #e8f6ee;
+  --warn: #a35a06;
+  --warn-soft: #fdf6e3;
+  --danger: #c62828;
+  --danger-soft: #fdecec;
+  --tile-shadow: 0 1px 2px rgb(26 26 46 / 0.04), 0 4px 18px rgb(26 26 46 / 0.04);
+  --tile-shadow-hover: 0 2px 4px rgb(26 26 46 / 0.04), 0 12px 32px rgb(26 26 46 / 0.08);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #09090b;
-    --surface: #111113;
-    --surface-2: #18181b;
-    --line: #27272a;
-    --line-soft: #1f1f23;
-    --ink: #fafafa;
-    --text: #d4d4d8;
-    --muted: #a1a1aa;
-    --faint: #71717a;
-    --accent: #fafafa;
-    --accent-hover: #e4e4e7;
-    --accent-soft: #18181b;
-    --accent-ink: #09090b;
-    --success: #4ade80;
-    --success-soft: #052e16;
-    --warn: #fbbf24;
-    --warn-soft: #2a1a04;
-    --danger: #f87171;
-    --danger-soft: #2a0a0a;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --bg: #101018;
+    --surface: #191924;
+    --surface-2: #232331;
+    --line: #2d2d3d;
+    --line-soft: #242432;
+    --ink: #f4f4f7;
+    --text: #c9c9d6;
+    --muted: #9a9aad;
+    --faint: #6f6f84;
+    --accent: #f4f4f7;
+    --accent-hover: #dcdce6;
+    --accent-soft: #232331;
+    --accent-ink: #1a1a2e;
+    --success: #5fd39b;
+    --success-soft: #11291e;
+    --warn: #f5c451;
+    --warn-soft: #2b2110;
+    --danger: #f28b82;
+    --danger-soft: #2e1414;
+    --tile-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+    --tile-shadow-hover: 0 8px 28px rgb(0 0 0 / 0.45);
     color-scheme: dark;
   }
 }
@@ -71,9 +77,17 @@
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --font-sans: var(--font-geist-sans);
-  --font-display: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Bento accent set, for marketing tiles. */
+  --color-wasabi: #4caf82;
+  --color-umami: #ff6b35;
+  --color-sakura: #f472b6;
+  --color-matcha: #86efac;
+  --color-tamago: #fcd34d;
+  --color-ume: #a78bfa;
+  --color-tsuyu: #38bdf8;
+  --color-kombu: #374151;
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-jakarta);
 }
 
 html {
@@ -84,7 +98,15 @@ html {
 body {
   background: var(--bg);
   color: var(--text);
-  font-feature-settings: "ss01", "cv11";
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-jakarta);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 ::selection {
@@ -95,7 +117,7 @@ body {
 @utility wrap {
   margin-inline: auto;
   width: 100%;
-  max-width: 68rem;
+  max-width: 75rem;
   padding-inline: 1rem;
   @media (width >= 40rem) {
     padding-inline: 1.5rem;
@@ -103,9 +125,9 @@ body {
 }
 
 @utility eyebrow {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -115,14 +137,18 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border: 1px solid transparent;
-  border-radius: 0.625rem;
-  padding: 0.6rem 1rem;
+  border: 2px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0.6rem 1.25rem;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.25rem;
-  transition: background-color 150ms, color 150ms, border-color 150ms, opacity 150ms;
+  white-space: nowrap;
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, transform 200ms ease;
   cursor: pointer;
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
   &:disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -130,8 +156,9 @@ body {
 }
 
 @utility btn-sm {
-  padding: 0.4rem 0.75rem;
+  padding: 0.4rem 0.85rem;
   font-size: 0.82rem;
+  border-radius: 0.65rem;
 }
 
 @utility btn-primary {
@@ -144,7 +171,7 @@ body {
 
 @utility btn-ghost {
   border-color: var(--line);
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
   &:hover:not(:disabled) {
     background: var(--surface-2);
@@ -153,7 +180,7 @@ body {
 
 @utility btn-danger {
   border-color: var(--line);
-  background: var(--surface);
+  background: transparent;
   color: var(--danger);
   &:hover:not(:disabled) {
     background: var(--danger-soft);
@@ -162,16 +189,16 @@ body {
 
 @utility field {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 0.625rem;
+  border: 1.5px solid var(--line);
+  border-radius: 0.75rem;
   background: var(--surface);
-  padding: 0.55rem 0.75rem;
+  padding: 0.55rem 0.8rem;
   font-size: 1rem;
   color: var(--ink);
   outline: none;
-  transition: border-color 150ms, box-shadow 150ms;
+  transition: border-color 200ms, box-shadow 200ms;
   @media (width >= 40rem) {
-    font-size: 0.9rem;
+    font-size: 0.92rem;
   }
   &::placeholder {
     color: var(--faint);
@@ -190,15 +217,23 @@ body {
   color: var(--ink);
 }
 
+/* A bento tile: white on the warm canvas, separated by contrast and a whisper of shadow. */
 @utility panel {
-  border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 1.25rem;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--tile-shadow);
+}
+
+@utility tile-hover {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--tile-shadow-hover);
+  }
 }
 
 @utility skeleton {
-  border-radius: 0.625rem;
+  border-radius: 1.25rem;
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--line-soft) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
@@ -221,5 +256,9 @@ body {
   }
   .skeleton {
     animation: none;
+  }
+  .tile-hover:hover,
+  .btn:hover {
+    transform: none;
   }
 }

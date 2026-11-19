@@ -32,7 +32,7 @@ export default async function PublicProfilePage({ params }: PageProps<"/[usernam
     notFound();
   }
   return (
-    <main className="min-h-dvh px-3 py-6 sm:px-4 sm:py-12">
+    <main className="min-h-dvh px-3 py-4 sm:px-6 sm:py-10">
       <ProfileView profile={profile} username={username}>
         {profile.acceptLeads !== false && <ShareBack username={username} firstName={profile.displayName.split(/\s+/)[0]} />}
         <SaveToHelloQR username={username} displayName={profile.displayName} headline={profile.headline} thumb={profile.thumb} />

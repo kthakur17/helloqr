@@ -47,11 +47,13 @@ function cssVar(name: string, fallback: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-const sans = () => cssVar("--font-geist-sans", "sans-serif");
-const mono = () => cssVar("--font-geist-mono", "monospace");
+const sans = () => cssVar("--font-inter", "sans-serif");
+const display = () => cssVar("--font-jakarta", "sans-serif");
+// Addresses are set in the body face; a separate monospace would be a third font to load.
+const mono = sans;
 
 export async function loadCardFonts() {
-  const specs = [`400 40px ${sans()}`, `500 40px ${sans()}`, `600 40px ${sans()}`, `400 40px ${mono()}`];
+  const specs = [`400 40px ${sans()}`, `500 40px ${sans()}`, `700 40px ${display()}`, `800 40px ${display()}`];
   await Promise.all(specs.map((spec) => document.fonts.load(spec).catch(() => [])));
 }
 
@@ -262,7 +264,7 @@ function layoutText(
   sizes: { name: number; nameMin: number; headline: number; roles: number },
 ): TextBlock {
   const attempt = (headlineMax: number, withRoles: boolean, scale: number): TextBlock => {
-    const fittedName = fitOrClip(ctx, card.name, sans(), 600, sizes.name * scale, sizes.nameMin, width);
+    const fittedName = fitOrClip(ctx, card.name, display(), 800, sizes.name * scale, sizes.nameMin, width);
     const name = fittedName.text;
     const nameSize = fittedName.size;
     const headlineSize = sizes.headline * scale;
@@ -301,8 +303,8 @@ function drawText(ctx: CanvasRenderingContext2D, block: TextBlock, x: number, to
   ctx.textBaseline = "alphabetic";
   let y = top + block.nameSize * 0.82;
   ctx.fillStyle = p.ink;
-  ctx.font = `600 ${block.nameSize}px ${sans()}`;
-  setSpacing(ctx, -block.nameSize * 0.012);
+  ctx.font = `800 ${block.nameSize}px ${display()}`;
+  setSpacing(ctx, -block.nameSize * 0.03);
   ctx.fillText(block.name, x, y);
   setSpacing(ctx, 0);
   y += block.nameSize * 0.23;
@@ -479,10 +481,10 @@ export function renderEventPoster(canvas: HTMLCanvasElement, event: EventCard) {
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = p.ink;
-  ctx.font = `600 84px ${sans()}`;
+  ctx.font = `800 84px ${display()}`;
   let y = 320;
   for (const line of wrap(ctx, event.name, W - 200, 2)) {
-    fitLine(ctx, line, sans(), 600, 84, 44, W - 200);
+    fitLine(ctx, line, display(), 800, 84, 44, W - 200);
     setSpacing(ctx, -1);
     ctx.fillText(line, W / 2, y);
     setSpacing(ctx, 0);

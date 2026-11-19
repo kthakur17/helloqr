@@ -89,7 +89,7 @@ export function SaveToHelloQR({
   const firstName = displayName.split(/\s+/)[0];
 
   return (
-    <div className="px-6 pb-5 sm:px-8">
+    <div>
       {(state.kind === "idle" || state.kind === "loading") && (
         <button
           type="button"

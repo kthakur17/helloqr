@@ -46,7 +46,7 @@ export function ShareBack({ username, firstName }: { username: string; firstName
 
   if (state === "sent") {
     return (
-      <div className="px-6 pb-4 sm:px-8">
+      <div>
         <p className="rounded-xl bg-success-soft p-3 text-center text-sm font-medium text-success">
           Sent. {firstName} now has your details.
         </p>
@@ -56,7 +56,7 @@ export function ShareBack({ username, firstName }: { username: string; firstName
 
   if (state === "closed") {
     return (
-      <div className="px-6 pb-3 sm:px-8">
+      <div>
         <button
           type="button"
           onClick={() => {
@@ -75,7 +75,7 @@ export function ShareBack({ username, firstName }: { username: string; firstName
   }
 
   return (
-    <form onSubmit={submit} className="mx-6 mb-4 rounded-xl border border-line p-4 sm:mx-8" noValidate>
+    <form onSubmit={submit} className="rounded-xl border border-line p-4" noValidate>
       <p className="font-medium text-ink">Share your details with {firstName}</p>
       <p className="mt-0.5 text-xs text-muted">Only {firstName} will see them.</p>
 

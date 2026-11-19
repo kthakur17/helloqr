@@ -17,7 +17,7 @@ export function Logo({ href = "/" }: { href?: string }) {
   return (
     <Link href={href} className="inline-flex items-center gap-2 text-ink">
       <LogoMark />
-      <span className="text-[0.95rem] font-semibold tracking-tight">HelloQR</span>
+      <span className="font-display text-[1.05rem] font-extrabold tracking-[-0.02em]">HelloQR</span>
     </Link>
   );
 }

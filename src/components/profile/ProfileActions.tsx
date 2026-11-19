@@ -9,6 +9,7 @@ export function TrackedLink({
   linkId,
   preview,
   className,
+  style,
   children,
 }: {
   href: string;
@@ -16,10 +17,15 @@ export function TrackedLink({
   linkId: string;
   preview: boolean;
   className: string;
+  style?: React.CSSProperties;
   children: React.ReactNode;
 }) {
   if (preview) {
-    return <div className={className}>{children}</div>;
+    return (
+      <div className={className} style={style}>
+        {children}
+      </div>
+    );
   }
   // Plain https links: the phone hands them to the installed app (LinkedIn, X, GitHub…) or the browser.
   return (
@@ -28,6 +34,7 @@ export function TrackedLink({
       target="_blank"
       rel="me noopener noreferrer"
       className={className}
+      style={style}
       onClick={() => track(username, `click_${linkId}`)}
     >
       {children}

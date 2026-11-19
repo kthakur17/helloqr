@@ -21,9 +21,15 @@ A digital business card for professionals and founders, with an event mode for c
   you met. Organisers can export the attendee list as CSV, remove people, and close the event.
 - **Connections**: private list of people you saved, filterable by event, with notes and CSV export.
 
+## Design
+
+The visual language (warm canvas, rounded white tiles, uniform gaps, Plus Jakarta Sans with Inter) is
+adapted from the **Bento Grid** guide in [chrislemke/website_designs](https://github.com/chrislemke/website_designs)
+(MIT License, © its author). The dark theme and the card layouts are HelloQR's own.
+
 ## Stack
 
-Next.js 16 (App Router, Turbopack) · React 19 · Tailwind CSS 4 · Geist · Firebase Auth (Google, optional
+Next.js 16 (App Router, Turbopack) · React 19 · Tailwind CSS 4 · Plus Jakarta Sans + Inter · Firebase Auth (Google, optional
 GitHub) · Cloud Firestore · `qrcode` · brand icons from simple-icons (CC0).
 
 Photos are stored as small JPEG data URLs inside the profile document, so the project runs on Firebase's
