@@ -37,21 +37,26 @@ export function ProfileView({
   return (
     <article className="@container mx-auto w-full max-w-xl" style={accentStyle(profile.accent)}>
       <div className="overflow-hidden rounded-[1.75rem] bg-surface shadow-[var(--tile-shadow)]">
-        <div
-          aria-hidden="true"
-          className="h-28 @md:h-36"
-          style={{
-            background:
-              "radial-gradient(120% 140% at 100% 0%, rgb(255 255 255 / 0.28), transparent 55%), linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, #12121f))",
-          }}
-        />
+        {profile.cover ? (
+          // eslint-disable-next-line @next/next/no-img-element -- stored data URL, nothing for next/image to optimise
+          <img src={profile.cover} alt="" className="block aspect-[3/1] w-full bg-surface-2 object-cover" />
+        ) : (
+          <div
+            aria-hidden="true"
+            className="h-28 @md:h-36"
+            style={{
+              background:
+                "radial-gradient(120% 140% at 100% 0%, rgb(255 255 255 / 0.28), transparent 55%), linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, #12121f))",
+            }}
+          />
+        )}
 
         <header className="px-6 pb-7 @md:px-9">
           <Avatar
             src={profile.photo}
             name={profile.displayName}
             accent={profile.accent}
-            className="-mt-14 size-28 border-[5px] border-surface text-3xl @md:-mt-16 @md:size-32"
+            className="relative -mt-14 size-28 border-[5px] border-surface text-3xl @md:-mt-16 @md:size-32"
           />
           <h1 className="mt-4 text-[1.85rem] leading-tight font-extrabold tracking-[-0.03em] text-ink @md:text-[2.1rem]">{profile.displayName}</h1>
           {profile.headline && <p className="mt-1.5 text-[0.98rem] text-muted">{profile.headline}</p>}

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Crop, type ImageSource } from "@/lib/image";
 
-const VIEW = 260;
 const MAX_ZOOM = 4;
 
 interface Offset {
@@ -12,26 +11,36 @@ interface Offset {
 }
 
 /**
- * Drag to move the photo inside the circle, slider (or wheel / pinch-free +/- buttons) to zoom.
- * Reports the square crop in source pixels; the caller turns it into the stored JPEGs.
+ * Drag to move the image inside the frame (a circle for photos, a wide box for banners), slider
+ * (or wheel / +/- buttons) to zoom. Reports the crop in source pixels; the caller turns it into
+ * the stored JPEGs.
  */
 export function PhotoCropper({
   source,
   previewUrl,
   onCancel,
   onApply,
+  aspect = 1,
+  title = "Position your photo",
+  applyLabel = "Use photo",
 }: {
   source: ImageSource;
   /** Something an <img> can show for the same image (object URL or data URL). */
   previewUrl: string;
   onCancel: () => void;
   onApply: (crop: Crop) => void;
+  /** Width / height of the frame; 1 is a circle. */
+  aspect?: number;
+  title?: string;
+  applyLabel?: string;
 }) {
-  const baseScale = VIEW / Math.min(source.width, source.height);
+  const VIEW_W = aspect === 1 ? 260 : 300;
+  const VIEW_H = VIEW_W / aspect;
+  const baseScale = Math.max(VIEW_W / source.width, VIEW_H / source.height);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState<Offset>(() => ({
-    x: (VIEW - source.width * baseScale) / 2,
-    y: (VIEW - source.height * baseScale) / 2,
+    x: (VIEW_W - source.width * baseScale) / 2,
+    y: (VIEW_H - source.height * baseScale) / 2,
   }));
   const drag = useRef<{ id: number; startX: number; startY: number; from: Offset } | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -39,19 +48,19 @@ export function PhotoCropper({
   const scale = baseScale * zoom;
   const clamp = useCallback(
     (o: Offset, s: number): Offset => ({
-      x: Math.min(0, Math.max(VIEW - source.width * s, o.x)),
-      y: Math.min(0, Math.max(VIEW - source.height * s, o.y)),
+      x: Math.min(0, Math.max(VIEW_W - source.width * s, o.x)),
+      y: Math.min(0, Math.max(VIEW_H - source.height * s, o.y)),
     }),
-    [source.width, source.height],
+    [source.width, source.height, VIEW_W, VIEW_H],
   );
 
   function zoomTo(next: number) {
     const z = Math.min(MAX_ZOOM, Math.max(1, next));
     const newScale = baseScale * z;
-    // Keep the point under the centre of the circle fixed while zooming.
-    const cx = (VIEW / 2 - offset.x) / scale;
-    const cy = (VIEW / 2 - offset.y) / scale;
-    setOffset(clamp({ x: VIEW / 2 - cx * newScale, y: VIEW / 2 - cy * newScale }, newScale));
+    // Keep the point under the centre of the frame fixed while zooming.
+    const cx = (VIEW_W / 2 - offset.x) / scale;
+    const cy = (VIEW_H / 2 - offset.y) / scale;
+    setOffset(clamp({ x: VIEW_W / 2 - cx * newScale, y: VIEW_H / 2 - cy * newScale }, newScale));
     setZoom(z);
   }
 
@@ -67,8 +76,7 @@ export function PhotoCropper({
   }
 
   function apply() {
-    const size = VIEW / scale;
-    onApply({ x: -offset.x / scale, y: -offset.y / scale, size });
+    onApply({ x: -offset.x / scale, y: -offset.y / scale, size: VIEW_W / scale });
   }
 
   return (
@@ -83,15 +91,15 @@ export function PhotoCropper({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="crop-title" className="text-lg font-semibold text-ink">
-          Position your photo
+          {title}
         </h2>
         <p className="mt-1 text-sm text-muted">Drag to move, use the slider to zoom.</p>
 
         <div
-          className="relative mx-auto mt-5 cursor-grab touch-none overflow-hidden rounded-full bg-surface-2 select-none active:cursor-grabbing"
-          style={{ width: VIEW, height: VIEW }}
+          className={`relative mx-auto mt-5 cursor-grab touch-none overflow-hidden bg-surface-2 select-none active:cursor-grabbing ${aspect === 1 ? "rounded-full" : "rounded-xl"}`}
+          style={{ width: VIEW_W, height: VIEW_H }}
           tabIndex={0}
-          aria-label="Photo position. Use arrow keys to move."
+          aria-label="Image position. Use arrow keys to move."
           onKeyDown={(e) => {
             const step = e.shiftKey ? 20 : 6;
             const moves: Record<string, [number, number]> = {
@@ -162,7 +170,7 @@ export function PhotoCropper({
             Cancel
           </button>
           <button type="button" className="btn btn-primary btn-sm" onClick={apply}>
-            Use photo
+            {applyLabel}
           </button>
         </div>
       </div>

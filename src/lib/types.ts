@@ -74,6 +74,8 @@ export interface Profile {
   photo: string;
   /** 72px version used in attendee lists and saved connections. */
   thumb: string;
+  /** 1200x400 JPEG data URL shown as the card's banner; missing or "" = accent gradient. */
+  cover?: string;
   roles: string[];
   links: LinkItem[];
   accent: Accent;

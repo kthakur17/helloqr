@@ -32,7 +32,7 @@ service cloud.firestore {
     }
 
     function validProfile(d) {
-      return d.keys().hasOnly(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'roles', 'links',
+      return d.keys().hasOnly(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'cover', 'roles', 'links',
           'accent', 'contactEmail', 'contactPhone', 'acceptLeads', 'createdAt', 'updatedAt'])
         && d.keys().hasAll(['uid', 'displayName', 'headline', 'bio', 'photo', 'thumb', 'roles', 'links',
           'accent', 'contactEmail', 'contactPhone', 'createdAt', 'updatedAt'])
@@ -41,6 +41,7 @@ service cloud.firestore {
         && str(d.bio, 0, 400)
         && str(d.photo, 0, 90000)
         && str(d.thumb, 0, 8000)
+        && (!('cover' in d) || str(d.cover, 0, 140000))
         && d.roles is list && d.roles.size() <= 6
         && d.links is list && d.links.size() <= 20
         && d.accent in ['slate', 'indigo', 'blue', 'sky', 'teal', 'green', 'yellow', 'orange', 'brown', 'red', 'pink', 'purple']

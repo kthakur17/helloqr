@@ -4,10 +4,12 @@
 /** 480 px keeps a large photo sharp on a 300 dpi print; the size cap stays under the rules' 90,000 chars. */
 const PHOTO = { side: 480, maxChars: 88_000 };
 const THUMB = { side: 72, maxChars: 7_800 };
+/** 3:1 banner, sharp on a 2x screen at the card's width; the cap stays under the rules' 140,000 chars. */
+export const COVER = { width: 1200, height: 400, maxChars: 136_000 };
 
 export type ImageSource = (HTMLImageElement | ImageBitmap) & { width: number; height: number };
 
-/** A square region of the source, in source pixels. */
+/** A region of the source in source pixels; `size` is its width, and its height follows the output's aspect. */
 export interface Crop {
   x: number;
   y: number;
@@ -19,15 +21,15 @@ export function centreCrop(source: { width: number; height: number }): Crop {
   return { x: (source.width - size) / 2, y: (source.height - size) / 2, size };
 }
 
-function squareJpeg(source: ImageSource, crop: Crop, side: number, maxChars: number): string {
+function jpeg(source: ImageSource, crop: Crop, width: number, height: number, maxChars: number): string {
   const canvas = document.createElement("canvas");
-  canvas.width = side;
-  canvas.height = side;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d")!;
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, side, side);
+  ctx.fillRect(0, 0, width, height);
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(source, crop.x, crop.y, crop.size, crop.size, 0, 0, side, side);
+  ctx.drawImage(source, crop.x, crop.y, crop.size, (crop.size * height) / width, 0, 0, width, height);
   for (let quality = 0.88; quality >= 0.4; quality -= 0.06) {
     const url = canvas.toDataURL("image/jpeg", quality);
     if (url.length <= maxChars) {
@@ -40,9 +42,13 @@ function squareJpeg(source: ImageSource, crop: Crop, side: number, maxChars: num
 /** Produces the stored photo and thumbnail from a square crop of any source. */
 export function photosFromCrop(source: ImageSource, crop: Crop) {
   return {
-    photo: squareJpeg(source, crop, PHOTO.side, PHOTO.maxChars),
-    thumb: squareJpeg(source, crop, THUMB.side, THUMB.maxChars),
+    photo: jpeg(source, crop, PHOTO.side, PHOTO.side, PHOTO.maxChars),
+    thumb: jpeg(source, crop, THUMB.side, THUMB.side, THUMB.maxChars),
   };
+}
+
+export function coverFromCrop(source: ImageSource, crop: Crop): string {
+  return jpeg(source, crop, COVER.width, COVER.height, COVER.maxChars);
 }
 
 export async function sourceFromFile(file: File): Promise<ImageBitmap> {

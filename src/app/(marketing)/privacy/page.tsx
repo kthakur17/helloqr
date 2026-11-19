@@ -31,7 +31,7 @@ export default function PrivacyPage() {
             your password, and HelloQR has no access to your email, contacts, calendar or files.
           </li>
           <li>
-            <strong>What you put on your card:</strong> name, headline, roles, bio, photo, links, and, only if you add them, an email
+            <strong>What you put on your card:</strong> name, headline, roles, bio, photo, cover image, links, and, only if you add them, an email
             address and phone number. <strong>Your card is public</strong> to anyone who has your link or scans your QR code.
           </li>
           <li>

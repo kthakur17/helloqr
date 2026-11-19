@@ -7,7 +7,7 @@ import { useAccount } from "@/components/dashboard/DashboardShell";
 import { ProfileView } from "@/components/profile/ProfileView";
 import { saveProfile } from "@/lib/data";
 import { PhotoCropper } from "@/components/dashboard/PhotoCropper";
-import { type Crop, photosFromCrop, photosFromUrl, sourceFromFile, sourceFromUrl } from "@/lib/image";
+import { type Crop, coverFromCrop, photosFromCrop, photosFromUrl, sourceFromFile, sourceFromUrl } from "@/lib/image";
 import { LINK_SPECS, LINK_TYPE_ORDER, newLinkId, normalizeLinkValue } from "@/lib/links";
 import { ACCENT_HEX, ACCENT_LABEL, ACCENTS, type LinkItem, type LinkType, type Profile } from "@/lib/types";
 
@@ -29,12 +29,13 @@ export default function ProfileEditorPage() {
   );
   const [status, setStatus] = useState<{ kind: "idle" | "saving" | "saved" | "error"; message?: string }>({ kind: "idle" });
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [cropping, setCropping] = useState<{ source: ImageBitmap; url: string; objectUrl: boolean } | null>(null);
+  const [cropping, setCropping] = useState<{ target: "photo" | "cover"; source: ImageBitmap; url: string; objectUrl: boolean } | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [newType, setNewType] = useState<LinkType>("linkedin");
   const [dragId, setDragId] = useState<string | null>(null);
   const [armedId, setArmedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
   const focusId = useRef<string | null>(null);
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(profile), [draft, profile]);
@@ -126,32 +127,35 @@ export default function ProfileEditorPage() {
     setCropping(null);
   }
 
-  async function onPhotoFile(file: File | undefined) {
+  async function onImageFile(file: File | undefined, target: "photo" | "cover") {
     if (!file) {
       return;
     }
     setPhotoBusy(true);
     try {
       const source = await sourceFromFile(file);
-      setCropping({ source, url: URL.createObjectURL(file), objectUrl: true });
+      setCropping({ target, source, url: URL.createObjectURL(file), objectUrl: true });
     } catch (e) {
-      setStatus({ kind: "error", message: e instanceof Error ? e.message : "Couldn't use that photo." });
+      setStatus({ kind: "error", message: e instanceof Error ? e.message : "Couldn't use that image." });
     } finally {
       setPhotoBusy(false);
-      if (fileRef.current) {
-        fileRef.current.value = "";
+      for (const input of [fileRef.current, coverRef.current]) {
+        if (input) {
+          input.value = "";
+        }
       }
     }
   }
 
-  async function adjustPhoto() {
+  async function adjustImage(target: "photo" | "cover") {
+    const url = target === "photo" ? draft.photo : (draft.cover ?? "");
     setPhotoBusy(true);
-    const source = await sourceFromUrl(draft.photo);
+    const source = await sourceFromUrl(url);
     setPhotoBusy(false);
     if (source) {
-      setCropping({ source, url: draft.photo, objectUrl: false });
+      setCropping({ target, source, url, objectUrl: false });
     } else {
-      setStatus({ kind: "error", message: "Couldn't open this photo for adjusting. Upload it again instead." });
+      setStatus({ kind: "error", message: "Couldn't open this image for adjusting. Upload it again instead." });
     }
   }
 
@@ -159,8 +163,8 @@ export default function ProfileEditorPage() {
     if (!cropping) {
       return;
     }
-    const photos = photosFromCrop(cropping.source, crop);
-    setDraft((d) => ({ ...d, ...photos }));
+    const patch = cropping.target === "photo" ? photosFromCrop(cropping.source, crop) : { cover: coverFromCrop(cropping.source, crop) };
+    setDraft((d) => ({ ...d, ...patch }));
     setStatus({ kind: "idle" });
     closeCropper();
   }
@@ -257,7 +261,7 @@ export default function ProfileEditorPage() {
           <div className="flex flex-wrap items-center gap-4">
             <Avatar src={draft.photo} name={draft.displayName || "?"} accent={draft.accent} ring className="size-20 text-2xl" />
             <div className="flex flex-wrap gap-2">
-              <input ref={fileRef} type="file" accept="image/*" className="sr-only" id="photo-file" onChange={(e) => onPhotoFile(e.target.files?.[0])} />
+              <input ref={fileRef} type="file" accept="image/*" className="sr-only" id="photo-file" onChange={(e) => onImageFile(e.target.files?.[0], "photo")} />
               <label htmlFor="photo-file" className="btn btn-ghost btn-sm cursor-pointer">
                 {photoBusy ? "Working…" : "Upload photo"}
               </label>
@@ -267,7 +271,7 @@ export default function ProfileEditorPage() {
                 </button>
               )}
               {draft.photo && (
-                <button type="button" className="btn btn-ghost btn-sm" onClick={adjustPhoto} disabled={photoBusy}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => adjustImage("photo")} disabled={photoBusy}>
                   Adjust
                 </button>
               )}
@@ -283,7 +287,49 @@ export default function ProfileEditorPage() {
             Without a photo, your initials are shown.
           </p>
         </Section>
-        {cropping && <PhotoCropper source={cropping.source} previewUrl={cropping.url} onCancel={closeCropper} onApply={applyCrop} />}
+
+        <Section title="Cover image">
+          <div
+            className="aspect-[3/1] w-full max-w-md overflow-hidden rounded-xl bg-cover bg-center"
+            style={{
+              backgroundImage: draft.cover
+                ? `url("${draft.cover}")`
+                : `linear-gradient(135deg, ${ACCENT_HEX[draft.accent] ?? ACCENT_HEX.blue}, color-mix(in srgb, ${ACCENT_HEX[draft.accent] ?? ACCENT_HEX.blue} 62%, #12121f))`,
+            }}
+            role="img"
+            aria-label={draft.cover ? "Your cover image" : "No cover image: your accent colour is shown"}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input ref={coverRef} type="file" accept="image/*" className="sr-only" id="cover-file" onChange={(e) => onImageFile(e.target.files?.[0], "cover")} />
+            <label htmlFor="cover-file" className="btn btn-ghost btn-sm cursor-pointer">
+              {photoBusy ? "Working…" : draft.cover ? "Change cover" : "Upload cover"}
+            </label>
+            {draft.cover && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => adjustImage("cover")} disabled={photoBusy}>
+                Adjust
+              </button>
+            )}
+            {draft.cover && (
+              <button type="button" className="btn btn-danger btn-sm" onClick={() => set("cover", "")}>
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-faint">
+            The banner across the top of your card. A wide image works best (3:1, like 1500×500). Without one, your accent colour is shown.
+          </p>
+        </Section>
+
+        {cropping && (
+          <PhotoCropper
+            key={cropping.target}
+            source={cropping.source}
+            previewUrl={cropping.url}
+            onCancel={closeCropper}
+            onApply={applyCrop}
+            {...(cropping.target === "cover" ? { aspect: 3, title: "Position your cover", applyLabel: "Use cover" } : {})}
+          />
+        )}
 
         <Section title="About you">
           <Field id="p-name" label="Name">
