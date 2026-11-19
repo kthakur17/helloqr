@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { Avatar } from "@/components/Avatar";
 import { BrandChip, brandTileColor } from "@/components/BrandIcon";
 import { LogoMark } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { owner } from "@/content/site";
 import { displayValue, hrefFor, linkTitle } from "@/lib/links";
 import { ACCENT_HEX, type LinkItem, type Profile } from "@/lib/types";
@@ -131,6 +132,7 @@ export function ProfileView({
                 <a href={`mailto:${owner.email}?subject=${encodeURIComponent(`HelloQR report: /${username}`)}`} className="transition-colors hover:text-ink">
                   Report
                 </a>
+                <ThemeToggle className="-my-2" />
               </span>
             )}
           </footer>

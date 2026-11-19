@@ -1,28 +1,12 @@
 import { addLead } from "@/lib/firebase/server";
 import { newLeadId, validateLead } from "@/lib/lead";
+import { clientIp, looksLikeBot, rateLimited, sameOrigin } from "@/lib/rateLimit";
 import { USERNAME_RE } from "@/lib/username";
-
-// Best-effort limit per server instance: a few submissions per address per window. The
-// database rules are the real boundary; this only slows down a casual script.
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_PER_WINDOW = 5;
-const recent = new Map<string, number[]>();
-
-function rateLimited(key: string, now: number) {
-  const times = (recent.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  times.push(now);
-  recent.set(key, times);
-  if (recent.size > 5000) {
-    recent.clear();
-  }
-  return times.length > MAX_PER_WINDOW;
-}
 
 const json = (status: number, body: object) => Response.json(body, { status });
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).host !== new URL(request.url).host) {
+  if (!sameOrigin(request)) {
     return json(403, { error: "Not allowed." });
   }
   let body: Record<string, unknown>;
@@ -36,13 +20,10 @@ export async function POST(request: Request) {
     return json(400, { error: "Invalid card." });
   }
   const now = Date.now();
-  // Honeypot field and a minimum fill time catch most bots; they get a fake success.
-  const startedAt = typeof body.t === "number" ? body.t : 0;
-  if (body.website || !startedAt || now - startedAt < 2500) {
+  if (looksLikeBot(body, now)) {
     return json(200, { ok: true });
   }
-  const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-  if (rateLimited(`${ip}|${username}`, now)) {
+  if (rateLimited(`lead|${clientIp(request)}|${username}`, 5, 10 * 60 * 1000, now)) {
     return json(429, { error: "You've sent a few already. Please try again later." });
   }
   const result = validateLead(body, now);

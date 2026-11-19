@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { EventView } from "@/components/events/EventView";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { formatDate } from "@/lib/cards";
 import { getPublicEvent } from "@/lib/firebase/server";
 
@@ -29,8 +30,9 @@ export default async function EventPage({ params }: PageProps<"/e/[eventId]">) {
   }
   return (
     <div className="min-h-dvh">
-      <header className="wrap flex h-16 items-center">
+      <header className="wrap flex h-16 items-center justify-between">
         <Logo />
+        <ThemeToggle />
       </header>
       <main className="wrap pb-16">
         <AuthProvider>

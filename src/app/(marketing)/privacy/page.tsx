@@ -48,6 +48,10 @@ export default function PrivacyPage() {
             account to do this. To have them removed, ask that person, or email us with the card link.
           </li>
           <li>
+            <strong>Feedback:</strong> what you write on the feedback page, the kind of feedback, the HelloQR page you came from, and
+            your email if you choose to leave it. Only the person running HelloQR reads it.
+          </li>
+          <li>
             <strong>Events:</strong> an event&apos;s name, date, venue and description are visible to anyone with the event link. Its
             attendee list (name, headline, small photo and HelloQR link) is visible only to people who joined and to the organiser,
             who can export it.

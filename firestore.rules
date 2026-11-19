@@ -8,6 +8,7 @@ rules_version = '2';
 //   profiles/{username}/counters/{key}   anyone may add exactly 1; only the owner reads
 //   profiles/{username}/leads/{id}       details visitors sent to the owner; only the owner reads
 //   retired/{username}                   usernames of deleted accounts, never reusable
+//   feedback/{id}                        product feedback; write-only, read in the Firebase console
 //   events/{eventId}                     public by id; organiser edits
 //   events/{eventId}/attendees/{uid}     visible to the event's attendees and organiser
 service cloud.firestore {
@@ -26,7 +27,7 @@ service cloud.firestore {
     }
 
     function reserved(name) {
-      return name in ['about', 'admin', 'api', 'app', 'dashboard', 'e', 'event', 'events', 'help', 'helloqr',
+      return name in ['about', 'admin', 'api', 'app', 'dashboard', 'e', 'event', 'events', 'feedback', 'help', 'helloqr',
         'home', 'login', 'logout', 'privacy', 'settings', 'signin', 'signup', 'support', 'terms', 'www'];
     }
 
@@ -139,6 +140,19 @@ service cloud.firestore {
           && request.resource.data.n == resource.data.n + 1;
         allow delete: if signedIn() && get(/databases/$(database)/documents/profiles/$(username)).data.uid == request.auth.uid;
       }
+    }
+
+    // Product feedback from /api/feedback. Nobody reads it through the app; the owner uses the console.
+    match /feedback/{id} {
+      allow create: if id.matches('^[a-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['kind', 'message', 'email', 'page', 'createdAt'])
+        && request.resource.data.keys().hasAll(['kind', 'message', 'email', 'page', 'createdAt'])
+        && request.resource.data.kind in ['idea', 'problem', 'praise', 'other']
+        && str(request.resource.data.message, 5, 2000)
+        && str(request.resource.data.email, 0, 120)
+        && str(request.resource.data.page, 0, 200)
+        && request.resource.data.createdAt is int;
+      allow read, update, delete: if false;
     }
 
     // Usernames of deleted accounts: kept forever so nobody else can claim a printed link.

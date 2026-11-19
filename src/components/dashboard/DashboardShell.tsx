@@ -7,6 +7,7 @@ import { useAuth, type AuthState } from "@/components/auth/AuthProvider";
 import { Avatar } from "@/components/Avatar";
 import { Logo } from "@/components/Logo";
 import { SetupNotice } from "@/components/SetupNotice";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Onboarding } from "./Onboarding";
 
 const NAV = [
@@ -95,6 +96,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="wrap flex h-16 items-center justify-between gap-3">
           <Logo href="/dashboard" />
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link href={`/${state.username}`} className="btn btn-ghost btn-sm hidden sm:inline-flex" target="_blank">
               View my card
             </Link>
@@ -107,6 +109,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <p className="truncate px-3 pb-2 text-muted">{state.user.email}</p>
                 <Link href={`/${state.username}`} target="_blank" className="block rounded-xl px-3 py-2 hover:bg-surface-2 sm:hidden">
                   View my card
+                </Link>
+                <Link href="/feedback" className="block rounded-xl px-3 py-2 hover:bg-surface-2">
+                  Send feedback
                 </Link>
                 <button type="button" onClick={() => logout()} className="block w-full rounded-xl px-3 py-2 text-left hover:bg-surface-2">
                   Sign out

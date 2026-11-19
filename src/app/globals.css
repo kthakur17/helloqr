@@ -30,8 +30,9 @@
   color-scheme: light;
 }
 
+/* Dark: follows the system unless the visitor picked a theme (html[data-theme], set by ThemeToggle). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #101018;
     --surface: #191924;
     --surface-2: #232331;
@@ -55,6 +56,31 @@
     --tile-shadow-hover: 0 8px 28px rgb(0 0 0 / 0.45);
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #101018;
+  --surface: #191924;
+  --surface-2: #232331;
+  --line: #2d2d3d;
+  --line-soft: #242432;
+  --ink: #f4f4f7;
+  --text: #c9c9d6;
+  --muted: #9a9aad;
+  --faint: #6f6f84;
+  --accent: #f4f4f7;
+  --accent-hover: #dcdce6;
+  --accent-soft: #232331;
+  --accent-ink: #1a1a2e;
+  --success: #5fd39b;
+  --success-soft: #11291e;
+  --warn: #f5c451;
+  --warn-soft: #2b2110;
+  --danger: #f28b82;
+  --danger-soft: #2e1414;
+  --tile-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  --tile-shadow-hover: 0 8px 28px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
 }
 
 @theme inline {

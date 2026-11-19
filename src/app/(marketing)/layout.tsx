@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +15,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/#events" className="hidden rounded-lg px-3 py-1.5 text-sm text-muted hover:text-ink sm:block">
               Events
             </Link>
-            <Link href="/dashboard" className="ml-2 rounded-lg px-3 py-1.5 text-sm text-ink hover:bg-surface-2">
+            <ThemeToggle />
+            <Link href="/dashboard" className="ml-1 rounded-lg px-3 py-1.5 text-sm text-ink hover:bg-surface-2">
               Sign in
             </Link>
             <Link href="/dashboard" className="btn btn-primary btn-sm hidden sm:inline-flex">
@@ -38,6 +40,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             </Link>
             <Link href="/terms" className="hover:text-ink">
               Terms
+            </Link>
+            <Link href="/feedback" className="hover:text-ink">
+              Feedback
             </Link>
           </nav>
         </div>

@@ -1,6 +1,7 @@
 import "server-only";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { doc, getDoc, getFirestore, increment, setDoc } from "firebase/firestore/lite";
+import type { Feedback } from "@/lib/feedback";
 import type { CounterKey, EventDoc, Lead, Profile } from "@/lib/types";
 import { USERNAME_RE } from "@/lib/username";
 
@@ -41,6 +42,11 @@ export async function getPublicEvent(eventId: string): Promise<EventDoc | null> 
 /** Writes a visitor's details to the card owner's private inbox; the rules re-check every field. */
 export async function addLead(username: string, id: string, lead: Lead): Promise<void> {
   await setDoc(doc(db(), "profiles", username, "leads", id), lead);
+}
+
+/** Product feedback goes to a collection only the project owner reads, in the Firebase console. */
+export async function addFeedback(id: string, feedback: Feedback): Promise<void> {
+  await setDoc(doc(db(), "feedback", id), feedback);
 }
 
 export const COUNTER_KEY_RE = /^(views|scans|saves|vcard|click_[a-z0-9]{1,16})$/;

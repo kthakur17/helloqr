@@ -13,8 +13,10 @@ import {
   type PersonCard,
   type PhotoPosition,
   type PhotoSize,
+  renderPocketBento,
   renderPocketCard,
   renderPoster,
+  renderPosterBento,
   renderQrOnly,
 } from "@/lib/cards";
 import { hrefFor } from "@/lib/links";
@@ -31,6 +33,8 @@ const DESIGNS: { id: Design; name: string; size: string; tip: string }[] = [
 
 interface Options {
   design: Design;
+  layout: "bento" | "classic";
+  bentoPhoto: boolean;
   style: CardStyle;
   photoInQr: boolean;
   pocketPosition: PhotoPosition;
@@ -43,6 +47,8 @@ interface Options {
 
 const DEFAULTS: Options = {
   design: "pocket",
+  layout: "bento",
+  bentoPhoto: true,
   style: "light",
   photoInQr: false,
   pocketPosition: "beside",
@@ -141,7 +147,8 @@ export default function QrStudioPage() {
     };
   }, [profile.photo]);
 
-  const position = opts.design === "poster" ? opts.posterPosition : opts.pocketPosition;
+  const bento = opts.layout === "bento";
+  const position: PhotoPosition = bento ? (opts.bentoPhoto ? "above" : "none") : opts.design === "poster" ? opts.posterPosition : opts.pocketPosition;
   const card: PersonCard = {
     name: profile.displayName,
     headline: profile.headline,
@@ -166,9 +173,9 @@ export default function QrStudioPage() {
       return;
     }
     if (opts.design === "pocket") {
-      renderPocketCard(canvas, card);
+      (bento ? renderPocketBento : renderPocketCard)(canvas, card);
     } else if (opts.design === "poster") {
-      renderPoster(canvas, card);
+      (bento ? renderPosterBento : renderPoster)(canvas, card);
     } else {
       renderQrOnly(canvas, card);
     }
@@ -230,6 +237,16 @@ export default function QrStudioPage() {
           {isCard && (
             <>
               <Segmented
+                label="Layout"
+                value={opts.layout}
+                options={[
+                  { id: "bento", text: "Bento" },
+                  { id: "classic", text: "Classic" },
+                ]}
+                onChange={(v) => set("layout", v)}
+              />
+
+              <Segmented
                 label="Style"
                 value={opts.style}
                 options={[
@@ -239,7 +256,17 @@ export default function QrStudioPage() {
                 onChange={(v) => set("style", v)}
               />
 
-              {opts.design === "pocket" ? (
+              {bento ? (
+                <Segmented
+                  label="Photo"
+                  value={opts.bentoPhoto ? "show" : "hide"}
+                  options={[
+                    { id: "show", text: "Show" },
+                    { id: "hide", text: "Hide" },
+                  ]}
+                  onChange={(v) => set("bentoPhoto", v === "show")}
+                />
+              ) : opts.design === "pocket" ? (
                 <Segmented
                   label="Photo"
                   value={opts.pocketPosition}
@@ -279,7 +306,7 @@ export default function QrStudioPage() {
                 <p className="label mb-0">Details</p>
                 <Toggle
                   label="Profile icons"
-                  hint="LinkedIn, X, GitHub… so people know where to find you."
+                  hint={bento ? "Shown in a tile in your accent colour." : "LinkedIn, X, GitHub… so people know where to find you."}
                   checked={opts.showIcons}
                   onChange={(v) => set("showIcons", v)}
                 />
@@ -290,7 +317,9 @@ export default function QrStudioPage() {
                   disabled={!contact}
                   onChange={(v) => set("showContact", v)}
                 />
-                <Toggle label="Accent colour bar" hint="Uses your card's accent colour." checked={opts.accentBar} onChange={(v) => set("accentBar", v)} />
+                {!bento && (
+                  <Toggle label="Accent colour bar" hint="Uses your card's accent colour." checked={opts.accentBar} onChange={(v) => set("accentBar", v)} />
+                )}
               </div>
             </>
           )}

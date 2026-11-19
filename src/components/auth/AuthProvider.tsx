@@ -22,7 +22,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+/** Exported for previews and tests that need a signed-in state without Firebase. */
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function loadAccount(user: User): Promise<AuthState> {
   const username = await getMyUsername(user.uid);

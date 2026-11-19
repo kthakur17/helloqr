@@ -11,6 +11,7 @@ export const RESERVED_USERNAMES = [
   "e",
   "event",
   "events",
+  "feedback",
   "help",
   "helloqr",
   "home",
