@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 const dev = process.env.NODE_ENV !== "production";
 
-// Report-only until a real Google sign-in has run clean against it; then rename the header to
-// Content-Security-Policy. Next.js inline bootstrap scripts need 'unsafe-inline' without nonces.
+// Enforced after a signed-in run in report-only mode showed no violations. Next.js inline bootstrap
+// scripts need 'unsafe-inline' without nonces.
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://apis.google.com https://www.gstatic.com`,
@@ -53,7 +53,7 @@ const nextConfig: NextConfig = {
       {
         // The proxied Firebase sign-in pages bring their own scripts, so they're left out.
         source: "/((?!__/auth/).*)",
-        headers: [{ key: "Content-Security-Policy-Report-Only", value: contentSecurityPolicy }],
+        headers: [{ key: "Content-Security-Policy", value: contentSecurityPolicy }],
       },
     ];
   },
