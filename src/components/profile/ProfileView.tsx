@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { type CSSProperties, Fragment } from "react";
-import { Avatar } from "@/components/Avatar";
+import { Avatar, safeCoverSrc } from "@/components/Avatar";
 import { BrandChip } from "@/components/BrandIcon";
 import { LogoMark } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -47,14 +47,15 @@ export function ProfileView({
   preview?: boolean;
   children?: React.ReactNode;
 }) {
+  const cover = safeCoverSrc(profile.cover);
   const links = profile.links.map((link) => ({ link, href: hrefFor(link) })).filter((l): l is { link: LinkItem; href: string } => l.href !== null);
 
   return (
     <article className="@container mx-auto w-full max-w-xl" style={accentStyle(profile.accent)}>
       <div className="overflow-hidden rounded-[1.75rem] bg-surface shadow-[var(--tile-shadow)]">
-        {profile.cover ? (
+        {cover ? (
           // eslint-disable-next-line @next/next/no-img-element -- stored data URL, nothing for next/image to optimise
-          <img src={profile.cover} alt="" className="block aspect-[3/1] w-full bg-surface-2 object-cover" />
+          <img src={cover} alt="" className="block aspect-[3/1] w-full bg-surface-2 object-cover" />
         ) : (
           <div
             aria-hidden="true"

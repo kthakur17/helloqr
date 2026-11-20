@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Avatar } from "@/components/Avatar";
+import { Avatar, safeCoverSrc } from "@/components/Avatar";
 import { BrandChip } from "@/components/BrandIcon";
 import { useAccount } from "@/components/dashboard/DashboardShell";
 import { ProfileView } from "@/components/profile/ProfileView";
@@ -292,8 +292,8 @@ export default function ProfileEditorPage() {
           <div
             className="aspect-[3/1] w-full max-w-md overflow-hidden rounded-xl bg-cover bg-center"
             style={{
-              backgroundImage: draft.cover
-                ? `url("${draft.cover}")`
+              backgroundImage: safeCoverSrc(draft.cover)
+                ? `url("${safeCoverSrc(draft.cover)}")`
                 : `linear-gradient(135deg, ${ACCENT_HEX[draft.accent] ?? ACCENT_HEX.blue}, color-mix(in srgb, ${ACCENT_HEX[draft.accent] ?? ACCENT_HEX.blue} 62%, #12121f))`,
             }}
             role="img"

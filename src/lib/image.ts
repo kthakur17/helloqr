@@ -1,3 +1,5 @@
+import { safeImageSrc } from "@/lib/safeImage";
+
 // Photos are stored as small JPEG data URLs in the profile document, which keeps the app
 // on Firebase's free plan (new Cloud Storage buckets need the paid Blaze plan).
 
@@ -67,7 +69,7 @@ export async function sourceFromFile(file: File): Promise<ImageBitmap> {
 
 /** Loads a stored data URL or an https avatar as something a canvas can read back. */
 export async function sourceFromUrl(url: string): Promise<ImageBitmap | null> {
-  if (!url) {
+  if (!safeImageSrc(url)) {
     return null;
   }
   try {

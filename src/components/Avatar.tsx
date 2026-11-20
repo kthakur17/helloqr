@@ -1,15 +1,7 @@
+import { safeImageSrc } from "@/lib/safeImage";
 import { ACCENT_HEX, type Accent } from "@/lib/types";
 
-/** Only our own data URLs and https avatars from sign-in providers are rendered. */
-export function safeImageSrc(src: string | undefined): string | null {
-  if (!src) {
-    return null;
-  }
-  if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(src)) {
-    return src;
-  }
-  return /^https:\/\/[^\s"'<>]+$/.test(src) ? src : null;
-}
+export { safeCoverSrc, safeImageSrc } from "@/lib/safeImage";
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

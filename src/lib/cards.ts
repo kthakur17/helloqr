@@ -1,6 +1,7 @@
 import { brandPaths } from "@/lib/brandPaths";
 import { wrapAtSeparators } from "@/lib/headline";
 import { drawQr } from "@/lib/qr";
+import { safeImageSrc } from "@/lib/safeImage";
 import type { LinkType } from "@/lib/types";
 
 export type CardStyle = "light" | "dark";
@@ -1487,7 +1488,7 @@ export function renderQrOnly(canvas: HTMLCanvasElement, card: Pick<PersonCard, "
 
 export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
-    if (!src) {
+    if (!safeImageSrc(src)) {
       resolve(null);
       return;
     }

@@ -30,5 +30,8 @@
     "simple-icons": "^16.38.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
   }
 }

@@ -1,5 +1,25 @@
 import type { NextConfig } from "next";
 
+const dev = process.env.NODE_ENV !== "production";
+
+// Report-only until a real Google sign-in has run clean against it; then rename the header to
+// Content-Security-Policy. Next.js inline bootstrap scripts need 'unsafe-inline' without nonces.
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://apis.google.com https://www.gstatic.com`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.googleusercontent.com https://avatars.githubusercontent.com",
+  "font-src 'self' data:",
+  `connect-src 'self' https://*.googleapis.com https://apis.google.com${dev ? " ws:" : ""}`,
+  "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   turbopack: {
     rules: {
@@ -25,7 +45,15 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // Our own pages may frame each other (Firebase sign-in uses a same-site iframe); nobody else may.
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
         ],
+      },
+      {
+        // The proxied Firebase sign-in pages bring their own scripts, so they're left out.
+        source: "/((?!__/auth/).*)",
+        headers: [{ key: "Content-Security-Policy-Report-Only", value: contentSecurityPolicy }],
       },
     ];
   },

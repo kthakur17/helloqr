@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { initials, safeImageSrc } from "@/components/Avatar";
+import { initials, safeCoverSrc, safeImageSrc } from "@/components/Avatar";
 import { ACCENT_HEX, type Profile } from "@/lib/types";
 
 export const OG_SIZE = { width: 1200, height: 630 };
@@ -83,7 +83,7 @@ export function cardPreviewImage(profile: Profile | null, username: string, host
   }
 
   const accent = ACCENT_HEX[profile.accent] ?? ACCENT_HEX.blue;
-  const cover = profile.cover && profile.cover.startsWith("data:image/") ? profile.cover : "";
+  const cover = safeCoverSrc(profile.cover);
 
   if (cover) {
     return new ImageResponse(
