@@ -1,4 +1,5 @@
 import { brandPaths } from "@/lib/brandPaths";
+import { wrapAtSeparators } from "@/lib/headline";
 import { drawQr } from "@/lib/qr";
 import type { LinkType } from "@/lib/types";
 
@@ -125,14 +126,19 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, max
 }
 
 /**
- * Wraps into the same number of lines as `wrap`, but as evenly as possible, so a headline never
- * ends with one stranded word ("… Community / Builder").
+ * Wraps into the same number of lines as `wrap`, breaking between the items of a list-style headline
+ * when that fits, otherwise as evenly as possible, so a headline never ends with one stranded word
+ * ("… Community / Builder").
  */
 function balancedWrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
   const greedy = wrap(ctx, text, maxWidth, maxLines);
   const natural = wrap(ctx, text, maxWidth, 99);
   if (greedy.length < 2 || natural.length > maxLines) {
     return greedy;
+  }
+  const byItem = wrapAtSeparators(text, natural.length, maxWidth, (s) => ctx.measureText(s).width);
+  if (byItem) {
+    return byItem;
   }
   let lo = maxWidth * 0.3;
   let hi = maxWidth;

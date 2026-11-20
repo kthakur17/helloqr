@@ -1,10 +1,11 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { type CSSProperties, Fragment } from "react";
 import { Avatar } from "@/components/Avatar";
 import { BrandChip } from "@/components/BrandIcon";
 import { LogoMark } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { owner } from "@/content/site";
+import { headlineSegments } from "@/lib/headline";
 import { displayValue, hrefFor, linkTitle } from "@/lib/links";
 import { ACCENT_HEX, type LinkItem, type Profile } from "@/lib/types";
 import { ShareButton, TrackedLink } from "./ProfileActions";
@@ -13,6 +14,20 @@ import { ShareButton, TrackedLink } from "./ProfileActions";
 export function accentStyle(accent: Profile["accent"]): CSSProperties {
   const hex = ACCENT_HEX[accent] ?? ACCENT_HEX.blue;
   return { "--accent": hex, "--accent-hover": hex, "--accent-ink": "#ffffff" } as CSSProperties;
+}
+
+/** Keeps each item of a list-style headline (and the separator after it) on one line, so breaks fall between items. */
+function headlineNodes(headline: string): React.ReactNode {
+  const segs = headlineSegments(headline);
+  if (segs.length < 2 || segs.some((s) => s.text.length > 40)) {
+    return headline;
+  }
+  return segs.map((s, i) => (
+    <Fragment key={i}>
+      <span className="whitespace-nowrap">{s.text + s.sep.trimEnd()}</span>
+      {s.sep ? " " : null}
+    </Fragment>
+  ));
 }
 
 /**
@@ -59,7 +74,7 @@ export function ProfileView({
             className="relative -mt-14 size-28 border-[5px] border-surface text-3xl @md:-mt-16 @md:size-32"
           />
           <h1 className="mt-4 text-[1.85rem] leading-tight font-extrabold tracking-[-0.03em] text-ink @md:text-[2.1rem]">{profile.displayName}</h1>
-          {profile.headline && <p className="mt-1.5 text-[0.98rem] text-muted">{profile.headline}</p>}
+          {profile.headline && <p className="mt-1.5 text-[0.98rem] text-balance text-muted">{headlineNodes(profile.headline)}</p>}
           {profile.roles.length > 0 && (
             <ul className="mt-4 flex flex-wrap gap-1.5">
               {profile.roles.map((role, i) => (

@@ -8,7 +8,7 @@ A digital business card for professionals and founders.
 
 ## Features
 
-- **Card page** at `/<username>`: photo, headline, roles and affiliations, bio, up to 20 links, *Save contact*
+- **Card page** at `/<username>`: cover image, photo, headline, roles and affiliations, bio, up to 20 links, *Save contact*
   (a vCard with photo and links) and *Share*. Server-rendered and free of the Firebase SDK, so it loads
   fast on venue Wi-Fi.
 - **Dashboard**: profile editor with live preview, drag/arrow reordering, and stats for views, QR scans,
@@ -101,3 +101,10 @@ Firestore never becomes a link.
 - The username can't be changed after it's claimed, because printed QR codes point at it.
 - Attendee and connection entries keep a snapshot of the name, headline and thumbnail from when they were
   saved. The card link always shows the live profile.
+- Apps cache link previews: after you add or change a cover, WhatsApp and LinkedIn can keep showing the
+  old preview for a while. LinkedIn's Post Inspector refreshes it on demand.
+
+## License
+
+[MIT](LICENSE) © 2026 Kunal Singh Thakur. The Bento Grid design guide it adapts is MIT-licensed by its
+author, and the brand icons are CC0 (simple-icons).
